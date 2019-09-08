@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mariadb
+  namespace: antiintuit
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: antiintuit-mariadb
+  template:
+    metadata:
+      labels:
+        app: antiintuit-mariadb
+    spec:
+      containers:
+        - name: mariadb
+          image: mariadb:10.4.7
+          args:
+            - --character-set-server=utf8mb4
+            - --collation-server=utf8mb4_unicode_ci
+          env:
+            - name: MYSQL_RANDOM_ROOT_PASSWORD
+              value: 'yes'
+            - name: MYSQL_DATABASE_FILE
+              value: /sec/DATABASE_NAME
+            - name: MYSQL_USER_FILE
+              value: /sec/DATABASE_USER
+            - name: MYSQL_PASSWORD_FILE
+              value: /sec/DATABASE_PASSWORD
+          ports:
+            - containerPort: 3306
+          volumeMounts:
+            - mountPath: /var/lib/mysql
+              name: mariadb-data
+            - mountPath: /sec
+              name: database-secret
+              readOnly: true
+      volumes:
+        - name: mariadb-data
+          persistentVolumeClaim:
+            claimName: mariadb
+        - name: database-secret
+          secret:
+            secretName: database-secret

@@ -1,0 +1,45 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: anitiintuit-tests-manager
+  namespace: antiintuit
+spec:
+  successfulJobsHistoryLimit: 0
+  failedJobsHistoryLimit: 0
+  schedule: "*/10 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            work: tests_manager
+        spec:
+          restartPolicy: OnFailure
+          securityContext:
+            fsGroup: 1000
+          containers:
+            - name: anitiintuit-tests-manager
+              image: maxsid/antiintuit
+              command:
+                - python
+                - -c
+                - from antiintuit.jobs.tests_manager import run_job; run_job()
+              envFrom:
+                - prefix: GRAYLOG_
+                  configMapRef:
+                    name: graylog-config
+              env:
+                - name: INTUIT_SSL_VERIFY
+                  value: "false"
+                - name: CONFIG_DIRECTORIES
+                  value: /sec
+              volumeMounts:
+                - mountPath: /sec
+                  name: database-secret
+                  readOnly: true
+          imagePullSecrets:
+            - name: maxsid-docker-hub
+          volumes:
+            - name: database-secret
+              secret:
+                secretName: database-secret
