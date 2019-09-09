@@ -41,7 +41,7 @@ def run_job():
         account.save()
         logger.warning(str(ex))
     except (CouldNotFindTest, TestIsAlreadySolved) as ex:
-        logger.warning(str(ex))
+        logger.info(str(ex))
     except Exception:
         if test_course_account is not None:
             test, account = test_course_account["test"], test_course_account["account"]
@@ -89,11 +89,12 @@ def get_test_course_account():
         sleep(sleep_time)
         test = (Test
                 .select(Test,
-                        (Test.middle_grade * 5 + Test.passed_count * 3 + Test.not_passed_count).alias("passing_score"))
+                        (Test.average_rating * 5 + Test.passed_count * 3 + Test.not_passed_count).alias(
+                            "passing_score"))
                 .join(Account, on=(Account.id == Test.watcher))
                 .where(Test.watcher.is_null(False) &
                        (Account.reserved_until < Config.get_account_reserve_out_moment()))
-                .order_by(SQL("`passing_score`"), Test.middle_grade, Test.last_scan_at, Test.created_at)
+                .order_by(SQL("`passing_score`"), Test.average_rating, Test.last_scan_at, Test.created_at)
                 .limit(1)).get()
         course, account = test.course, test.watcher
         account.reserve()
@@ -126,7 +127,7 @@ def get_passed_questions_and_answers(test: Test, course: Course, account: Accoun
             break
         request_executed_at = datetime.utcnow()
         # Creating and getting question and answers
-        question = get_or_create_question(question_form_bs, test)
+        question = get_or_create_question(question_form_bs, course)
         if question in questions:
             logger.warning("Question '%s' had been already in the questions list of the current passing.",
                            str(question))
@@ -228,12 +229,13 @@ def get_or_create_question(question_form_bs: BeautifulSoup, course: Course) -> Q
         except peewee.IntegrityError as ex:
             if ex.args[0] == 1062:
                 return get_or_create_question(question_form_bs, course)
+            raise
         if test_type in ("multiple", "single"):
             answers = generate_answers(question)
-            logger.info("Question has been created with %i answers and locked by '%s'.", len(answers),
-                        Config.SESSION_ID)
+            logger.info("Question '%s' has been created with %i answers and locked by '%s'.", str(question),
+                        len(answers), Config.SESSION_ID)
         else:
-            logger.info("Question type '%s' has been created without answer and locked by '%s'.", test_type,
+            logger.info("Question '%s' has been created without answers and locked by '%s'.", str(question),
                         Config.SESSION_ID)
     else:
         logger.debug("Question '%s' exists.", str(question))
@@ -277,6 +279,7 @@ def generate_answers(question: Question):
     for range_size in range(1, max_combinations_range + 1):
         for answer_combination in combinations(variants, range_size):
             answers.append(Answer.create(variants=list(answer_combination), status="U", question=question))
+    logger.debug("Generated %i answers for %s question.", len(answers), str(question))
     return answers
 
 
@@ -299,7 +302,6 @@ def get_answer_for_post_request(answer: Answer, question: Question = None) -> di
 
 def get_variants_list(answer_elements: BeautifulSoup) -> list:
     """Gets variants of answers and handle them"""
-    logger.debug("Finding variants of the question...")
     answers_list = list()
     variants_labels_bs = answer_elements.find_all("label", {"class": "option"})
     for variant_label in variants_labels_bs:
@@ -330,7 +332,7 @@ def repeat_test(test: Test, account: Account, session: Session):
     repeat_post_data = {"iduniver_edu_prog": ids[0], "course_id": ids[1], "type": ids[2], "idtest": ids[3]}
     session.post(repeat_url, repeat_post_data)
     account.reserve()
-    logger.info("Test '%s' is not accepted on the website by '%s'.", str(test), str(account))
+    logger.info("Test '%s' will be repeated on the website by '%s'.", str(test), str(account))
 
 
 def get_question_publish_id(form: BeautifulSoup) -> int:

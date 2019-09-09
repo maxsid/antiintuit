@@ -55,7 +55,10 @@ def create_courses_from_page(page: int, session: Session = None) -> dict:
         if course_element.find("div", {"class": "file_elements"}).find_all("span")[2].text == "платный":
             logger.debug("Skip course '%s' on %i page because it's a paid.", title, page)
             continue
-        publish_course_id = re.search(r"\d+/\d+", a_title_bs["href"]).group()
+        publish_course_id_match = re.search(r"\d+/\d+", a_title_bs["href"])
+        if publish_course_id_match is None:
+            continue
+        publish_course_id = publish_course_id_match.group()
         course = Course.get_or_none(Course.publish_id == publish_course_id)
         if course is None:
             Course.create(publish_id=publish_course_id,

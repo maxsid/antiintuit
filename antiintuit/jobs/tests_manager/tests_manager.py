@@ -24,7 +24,7 @@ def run_job():
     # Getting the tests of the first found course
     course = (Course
               .select()
-              .order_by(Course.last_scan_at)
+              .order_by(Course.last_scan_at, Course.published_on.desc())
               .limit(1)).get()
     if course.last_scan_at > Config.get_course_scan_timeout_moment():
         next_in = course.last_scan_at - Config.get_course_scan_timeout_moment()
@@ -37,7 +37,7 @@ def run_job():
         new_tests, found_tests = create_tests_of_course(course, account, session).values()
         logger.info("Tests result statistic:\n    Found tests - %i\n    New tests - %i",
                     found_tests, new_tests)
-    appoint_accounts_for_tests()
+    appoint_accounts_to_tests()
 
 
 def get_account_for_course(course: Course) -> dict:
@@ -100,7 +100,7 @@ def create_tests_of_course(course: Course, account: Account, session: Session = 
     return {"new": new_tests_count, "found": found_tests_count}
 
 
-def appoint_accounts_for_tests():
+def appoint_accounts_to_tests():
     """Appoints watching accounts for tests without watchers"""
     tests = (Test
              .select()

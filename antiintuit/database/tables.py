@@ -127,7 +127,7 @@ class Test(BaseModel):
     questions_count = IntegerField()
     passed_count = IntegerField(default=0)
     not_passed_count = IntegerField(default=0)
-    middle_grade = IntegerField(default=0)
+    average_rating = IntegerField(default=0)
 
     @property
     def publish_id_numbers(self):
@@ -147,18 +147,18 @@ class Test(BaseModel):
         self.save()
 
     def update_stats(self, passed, grade):
-        """Updates the middle grade, amount of the passes and the last update time"""
-        if self.middle_grade > 0:
-            self.middle_grade = int((self.middle_grade * self.total_passed + grade) / (self.total_passed + 1))
+        """Updates the average rating, amount of the passes and the last update time"""
+        if self.average_rating > 0:
+            self.average_rating = int((self.average_rating * self.total_passed + grade) / (self.total_passed + 1))
         else:
-            self.middle_grade = grade
+            self.average_rating = grade
         if passed:
             self.passed_count += 1
         else:
             self.not_passed_count += 1
         self.update_last_update()
-        logger.debug("'%s' test has been updated (middle: %i, passed: %i, not passed %i).",
-                     str(self), self.middle_grade, self.passed_count, self.not_passed_count)
+        logger.debug("'%s' test has been updated (average rating: %i, passed tests: %i, not passed tests %i).",
+                     str(self), self.average_rating, self.passed_count, self.not_passed_count)
 
     def set_watcher(self, watcher: Account):
         self.watcher = watcher
@@ -237,7 +237,7 @@ class Question(VariantsModelInterface):
             unlocked = (Question
                         .update({Question.locked_by: None, Question.locked_at: None})
                         .where(Question.locked_at < age_moment)).execute()
-            logger.info("%i old questions (max age: %i) have been unlocked", unlocked, age_moment)
+            logger.info("%i old questions (max age: %i) have been unlocked", unlocked, age_minutes)
 
     def delete_answers(self):
         logger.debug("The answers of '%s' question will be deleted.", str(self))
