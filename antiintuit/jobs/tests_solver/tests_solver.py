@@ -2,7 +2,7 @@ import random
 import re
 from datetime import datetime, timedelta
 from hashlib import sha3_256
-from itertools import combinations
+from itertools import combinations, product
 from time import sleep
 
 import peewee
@@ -28,11 +28,11 @@ logger = get_logger("antiintuit", "tests_solver")
 
 
 @exception(logger)
-def run_job():
+def run_job(test: Test = None):
     """Get a test and pass it"""
     test_course_account, session = None, None
     try:
-        test_course_account = get_test_course_account()
+        test_course_account = get_test_course_account(test)
         session = get_authorized_session(test_course_account["account"])
         pass_test(test_course_account, session)
     except TestIsTemporarilyUnavailableForPassByAccount as ex:
@@ -80,22 +80,22 @@ def pass_test(test_course_account: dict, session: Session):
     test.update_stats(is_test_passed, grade)
 
 
-def get_test_course_account():
+def get_test_course_account(test: Test = None):
     """Returns course and account of the first suitable test"""
     try:
-        # sleeping random time for containers will be out of sync
-        sleep_time = random.random() * Config.MAX_LATENCY_FOR_OUT_OF_SYNC
-        logger.debug("Session '%s' is sleeping during %f", Config.SESSION_ID, sleep_time)
-        sleep(sleep_time)
-        test = (Test
-                .select(Test,
-                        (Test.average_rating * 5 + Test.passed_count * 3 + Test.not_passed_count).alias(
-                            "passing_score"))
-                .join(Account, on=(Account.id == Test.watcher))
-                .where(Test.watcher.is_null(False) &
-                       (Account.reserved_until < Config.get_account_reserve_out_moment()))
-                .order_by(SQL("`passing_score`"), Test.average_rating, Test.last_scan_at, Test.created_at)
-                .limit(1)).get()
+        if test is None:
+            sleep_time = random.random() * Config.MAX_LATENCY_FOR_OUT_OF_SYNC
+            logger.debug("Session '%s' is sleeping during %f", Config.SESSION_ID, sleep_time)
+            sleep(sleep_time)
+            test = (Test
+                    .select(Test,
+                            (Test.average_rating * 5 + Test.passed_count * 3 + Test.not_passed_count).alias(
+                                "passing_score"))
+                    .join(Account, on=(Account.id == Test.watcher))
+                    .where(Test.watcher.is_null(False) &
+                           (Account.reserved_until < Config.get_account_reserve_out_moment()))
+                    .order_by(SQL("`passing_score`"), Test.average_rating, Test.last_scan_at, Test.created_at)
+                    .limit(1)).get()
         course, account = test.course, test.watcher
         account.reserve()
         logger.info("Selected '%s' test, '%s' course and '%s' account.", str(test), str(course), str(account))
@@ -138,7 +138,9 @@ def get_passed_questions_and_answers(test: Test, course: Course, account: Accoun
             logger.warning("Question '%s' doesn't have answers and they will be deleted and recreated.",
                            str(question))
             question.delete_answers()
-            answer = generate_answers(question)[0]
+            answer = generate_answers(question)
+            if isinstance(answer, (list, tuple)):
+                answer = answer[0]
         if isinstance(answer, Answer):
             logger.info("Answer '%s' (status: '%s') has been selected as answer on '%s' question.",
                         str(answer), answer.status, str(question))
@@ -211,12 +213,9 @@ def get_or_create_question(question_form_bs: BeautifulSoup, course: Course) -> Q
         question_title_bs = question_form_bs.find("div", {"class": "question"})
         answers_bs = question_form_bs.find("div", {"class": "answer"})
         # Create question and answers
-        question_title = get_handled_content(question_title_bs).strip()
+        question_title = get_handled_content(question_title_bs)
         test_type = answers_bs.find("input", {"name": "test_type"})["value"].strip()
-        if test_type in ("multiple", "single"):
-            variants_list = get_variants_list(answers_bs)
-        else:
-            variants_list = "no"
+        variants_list = get_variants_list(answers_bs, test_type)
         try:
             question = Question.create(
                 task_id=task_id,
@@ -230,13 +229,7 @@ def get_or_create_question(question_form_bs: BeautifulSoup, course: Course) -> Q
             if ex.args[0] == 1062:
                 return get_or_create_question(question_form_bs, course)
             raise
-        if test_type in ("multiple", "single"):
-            answers = generate_answers(question)
-            logger.info("Question '%s' has been created with %i answers and locked by '%s'.", str(question),
-                        len(answers), Config.SESSION_ID)
-        else:
-            logger.info("Question '%s' has been created without answers and locked by '%s'.", str(question),
-                        Config.SESSION_ID)
+        generate_answers(question)
     else:
         logger.debug("Question '%s' exists.", str(question))
         end_session_checks_datetime = datetime.utcnow() + timedelta(seconds=Config.MAX_LATENCY_FOR_SESSION_CHECKS)
@@ -250,7 +243,7 @@ def get_or_create_question(question_form_bs: BeautifulSoup, course: Course) -> Q
                          str(question), str(time_left).split(".")[0])
             sleep(Config.INTERVAL_BETWEEN_SESSION_CHECK)
             question = Question.get_or_none(Question.task_id == task_id)
-        if not question.is_right_answer_exists and question.type in ("multiple", "single"):
+        if not question.is_right_answer_exists and question.type in ("multiple", "single", "correlation"):
             logger.debug("Question doesn't have a right answer and will be locked by Session '%s'.", Config.SESSION_ID)
             question.lock()
     return question
@@ -267,8 +260,26 @@ def wait_timeout(started_at: datetime):
         sleep(time_for_sleep)
 
 
-def generate_answers(question: Question):
-    """Generates combinations of answers and records them in database"""
+def generate_answers(question: Question) -> list or str:
+    answers = None
+    if question.type in ("multiple", "single"):
+        answers = generate_default_answers(question)
+    elif question.type == "correlation":
+        answers = generate_correlation_answers(question)
+    elif question.type == "template":
+        logger.info("Question '%s' has been created without answers and locked by '%s'.", str(question),
+                    Config.SESSION_ID)
+        return question.variants
+    else:
+        raise IncorrectTestType("Question '{}' has incorrect '{}' type and system can't generate new answers.".format(
+            question.title, question.type))
+    logger.info("Question '%s' has been created with %i answers and locked by '%s'.", str(question),
+                len(answers), Config.SESSION_ID)
+    return answers
+
+
+def generate_default_answers(question: Question):
+    """Generates combinations of answers for multiple or single question and records them in database"""
     variants, answers = question.variants, []
     max_combinations_range = 1
     if question.type == "multiple":
@@ -278,7 +289,24 @@ def generate_answers(question: Question):
             question.title, question.type))
     for range_size in range(1, max_combinations_range + 1):
         for answer_combination in combinations(variants, range_size):
-            answers.append(Answer.create(variants=list(answer_combination), status="U", question=question))
+            answers.append(Answer.create(variants=list(answer_combination), question=question))
+    logger.debug("Generated %i answers for %s question.", len(answers), str(question))
+    return answers
+
+
+def generate_correlation_answers(question: Question):
+    """Generates combinations of answers for a correlation question and records them in database"""
+    variants, answers = question.variants, list()
+    all_variants = list()
+    for variant in variants:
+        variant, answer_variants = list(variant), list()
+        options = variant[3]
+        for option in options:
+            variant[3] = option
+            answer_variants.append(tuple(variant))
+        all_variants.append(answer_variants)
+    all_variants = product(*all_variants)
+    answers = [Answer.create(variants=vs, question=question) for vs in all_variants]
     logger.debug("Generated %i answers for %s question.", len(answers), str(question))
     return answers
 
@@ -295,23 +323,59 @@ def get_answer_for_post_request(answer: Answer, question: Question = None) -> di
         return dict(variant=first_variant[0])
     elif question.type == "template":
         return dict(variant=answer)
+    elif question.type == "correlation":
+        return dict(
+            map(lambda var: (var[1], var[3][1]), answer.variants)
+        )
     else:
         raise IncorrectTestType("Question '{}' has incorrect '{}' type and system can't send answers.".format(
             question.title, question.type))
 
 
-def get_variants_list(answer_elements: BeautifulSoup) -> list:
-    """Gets variants of answers and handle them"""
+def get_variants_list(answer_elements: BeautifulSoup, test_type: str = None) -> list or str:
+    test_type = test_type or answer_elements.find("input", {"name": "test_type"})["value"].strip()
+    if test_type in ("multiple", "single"):
+        return get_default_variants_list(answer_elements)
+    elif test_type == "correlation":
+        return get_correlation_variants_list(answer_elements)
+    elif test_type == "template":
+        return "no"
+    else:
+        raise IncorrectTestType("Question has incorrect '{}' type and system can't send answers.".format(test_type))
+
+
+def get_default_variants_list(answer_elements: BeautifulSoup) -> list:
+    """Gets variants of answers for a multiple or single question and handle them"""
     answers_list = list()
     variants_labels_bs = answer_elements.find_all("label", {"class": "option"})
     for variant_label in variants_labels_bs:
         variant_bs = variant_label.find("span", {"class": "right"})
-        variant_text = get_handled_content(variant_bs).strip()
+        variant_text = get_handled_content(variant_bs)
         variant_for = variant_label["for"].strip()
         variant_number = int(re.search(r'\d+$', variant_for).group())
         answers_list.append((variant_number, variant_for, variant_text))
     answers_list.sort()
     logger.debug("Found %i variants of the question.", len(answers_list))
+    return answers_list
+
+
+def get_correlation_variants_list(answer_elements: BeautifulSoup) -> list:
+    """Gets variants of answers for correlation question and handle them"""
+    answers_list = list()
+    left_lis_bs = answer_elements.find("div", {"class": "left td"}).find_all("li")
+    right_lis_bs = answer_elements.find("div", {"class": "right td"}).find_all("li")
+    for left_li, right_li in zip(left_lis_bs, right_lis_bs):
+        select_bs = right_li.find("select")
+        select_name = select_bs["name"]
+        select_number = int(re.search(r"\d+$", select_name).group())
+        left_li.find("span", {"class": "item-number"}).decompose()
+        select_title = get_handled_content(left_li)
+        select_options_filter = filter(lambda o: o.has_attr("value"), select_bs.find_all("option"))
+        select_options_data = list(map(lambda o: (o[0], o[1]["value"], o[1].text.strip()),
+                                       enumerate(select_options_filter)))
+        answers_list.append((select_number, select_name, select_title, select_options_data))
+    answers_list.sort()
+    logger.debug("Found %i variants of the correlation question.", len(answers_list))
     return answers_list
 
 

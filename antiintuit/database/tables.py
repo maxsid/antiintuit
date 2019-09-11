@@ -251,19 +251,22 @@ class Question(VariantsModelInterface):
     def get_next_answer(self):
         """Returns the first right or unchecked answer of the question"""
         try:
-            if self.type in ("multiple", "single"):
+            if self.type in ("multiple", "single", "correlation"):
                 return (Answer
                         .select()
                         .where((Answer.question == self) & (Answer.status != "W"))
                         .order_by(Answer.status).limit(1)).get()
-            else:
+            elif self.type == "template":
                 return self.variants
+            else:
+                raise DatabaseException("Couldn't get the next answer because incorrect type of '{}' question.",
+                                        str(self))
         except Answer.DoesNotExist:
             return None
 
 
 class Answer(VariantsModelInterface):
-    status = CharField(max_length=1,
+    status = CharField(max_length=1, default="U",
                        help_text="The field contains a status of the answer. Can be Right(R), Wrong(W) or Unchecked(U)")
     question = ForeignKeyField(Question, backref="answers")
 
