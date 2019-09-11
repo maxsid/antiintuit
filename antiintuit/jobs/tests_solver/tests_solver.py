@@ -351,9 +351,15 @@ def get_default_variants_list(answer_elements: BeautifulSoup) -> list:
     for variant_label in variants_labels_bs:
         variant_bs = variant_label.find("span", {"class": "right"})
         variant_text = get_handled_content(variant_bs)
-        variant_for = variant_label["for"].strip()
-        variant_number = int(re.search(r'\d+$', variant_for).group())
-        answers_list.append((variant_number, variant_for, variant_text))
+        variant_name = variant_label["for"]
+        variant_number = re.search(r'\d+$', variant_name)
+        if variant_number is not None:
+            variant_number = int(variant_number.group())
+        else:
+            # For case when form wrote incorrect (identical ids and names of the inputs)
+            # In this case any answer will be right
+            variant_number = ""
+        answers_list.append((variant_number, variant_name, variant_text))
     answers_list.sort()
     logger.debug("Found %i variants of the question.", len(answers_list))
     return answers_list
