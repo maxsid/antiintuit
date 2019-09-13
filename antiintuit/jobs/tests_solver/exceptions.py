@@ -7,7 +7,8 @@ __all__ = [
     "TestIsAlreadySolved",
     "TooManyCheckSessionIteration",
     "TestIsTemporarilyUnavailableForPassByAccount",
-    "MaxIterationsReached"
+    "MaxIterationsReached",
+    "TestUnsolvable"
 ]
 
 
@@ -52,4 +53,8 @@ class TestIsTemporarilyUnavailableForPassByAccount(TestSolverException):
 
 
 class MaxIterationsReached(TestSolverException):
+    pass
+
+
+class TestUnsolvable(TestSolverException):
     pass

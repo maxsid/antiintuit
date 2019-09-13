@@ -104,7 +104,7 @@ def appoint_accounts_to_tests():
     """Appoints watching accounts for tests without watchers"""
     tests = (Test
              .select()
-             .where(Test.watcher.is_null())
+             .where(Test.watcher.is_null() & (Test.unsolvable == False))
              .order_by(Test.last_scan_at))
     for test in tests:
         course_watchers = (Test.

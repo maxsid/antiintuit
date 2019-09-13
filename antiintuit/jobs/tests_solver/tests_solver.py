@@ -2,7 +2,7 @@ import random
 import re
 from datetime import datetime, timedelta
 from hashlib import sha3_256
-from itertools import combinations, product
+from itertools import combinations, product, count
 from time import sleep
 
 import peewee
@@ -40,6 +40,10 @@ def run_job(test: Test = None):
         account.reserved_until = datetime.utcnow() + timedelta(minutes=ex.minutes_to_pass + 2)
         account.save()
         logger.warning(str(ex))
+    except TestUnsolvable:
+        test = test_course_account["test"]
+        test.set_as_unsolvable()
+        logger.info("Test '%s' has marked as unsolvable", str(test))
     except (CouldNotFindTest, TestIsAlreadySolved) as ex:
         logger.info(str(ex))
     except Exception:
@@ -129,8 +133,8 @@ def get_passed_questions_and_answers(test: Test, course: Course, account: Accoun
         # Creating and getting question and answers
         question = get_or_create_question(question_form_bs, course)
         if question in questions:
-            logger.warning("Question '%s' had been already in the questions list of the current passing.",
-                           str(question))
+            logger.warning("Question '%s' had been already in the questions list of the current passing. "
+                           "Waiting %i seconds...", str(question), Config.INTERVAL_BETWEEN_QUESTIONS)
             sleep(Config.INTERVAL_BETWEEN_QUESTIONS)
             continue
         answer = question.get_next_answer()
@@ -194,10 +198,13 @@ def get_question_form(post_data: dict, session: Session) -> BeautifulSoup:
     question_bs = BeautifulSoup(question_json["data"], "html.parser")
     question_form_bs = question_bs.find("form", id="test-task-form")
     if question_form_bs is None:
+        laboratory_work_form = question_bs.find("form", {"class": "laboratory-work-form"})
         error_bs = question_bs.find("div", {"class": "eoi"})
         if 'попытка сдачи теста будет доступна через' in error_bs.text:
             minutes_to_pass = int(re.search(r"\d+", error_bs.text).group())
             raise TestIsTemporarilyUnavailableForPassByAccount(minutes_to_pass)
+        elif laboratory_work_form is not None:
+            raise TestUnsolvable("Current test can't be solved because it's necessary to upload a file to pass.")
         elif "Загрузка результатов тестирования" not in error_bs.text:
             raise TestSolverException("Incorrect error message: {}".format(error_bs.text))
     return question_form_bs
@@ -360,7 +367,7 @@ def get_default_variants_list(answer_elements: BeautifulSoup) -> list:
             # In this case any answer will be right
             variant_number = ""
         answers_list.append((variant_number, variant_name, variant_text))
-    answers_list.sort()
+    answers_list.sort(key=lambda a: a if isinstance(a[0], int) else (-1, *a[1:]))
     logger.debug("Found %i variants of the question.", len(answers_list))
     return answers_list
 
@@ -421,18 +428,20 @@ def update_answers(questions: list, answers: list, test_page_bs: BeautifulSoup, 
     answers_results_json = session.post(answers_results_url, answers_results_post_data).json()
     answers_results_bs = BeautifulSoup(answers_results_json["data"], "html.parser")
     test_task_list = answers_results_bs.find("div", id="test_task_list")
-    right_answers_count = 0
-    for question, answer in zip(questions, answers):
+    right_answers_count, questions_count = 0, len(questions)
+    for num, question, answer in zip(count(1), questions, answers):
         # Checking id in an answers list and a question
         task_list_item_like = test_task_list.find("div", id="likit-control-task_likeit_{}".format(question.task_id))
         if task_list_item_like is None:
-            logger.warning("Tasks list doesn't have '%s' question . Question will ignore.", str(question))
+            logger.warning("%i of %i: Tasks list doesn't have '%s' question . Question will ignore.",
+                           num, questions_count, str(question))
             continue
         task_list_item = task_list_item_like.parent.parent
         answer_span = task_list_item.find("span", {"class": "task_no"})
         if isinstance(answer, Answer) and "incorrect" in answer_span["class"]:
             answer.set_as_wrong()
-            logger.info("Answer '%s' of '%s' question is incorrect.", str(answer), str(question))
+            logger.info("%i of %i: Answer '%s' of '%s' question is incorrect.",
+                        num, questions_count, str(answer), str(question))
             if question.unchanged_answers_count == 1:
                 logger.debug("Question has the one unchecked answer. Previously it will be marked as right.")
                 prev_answer = question.get_next_answer()
@@ -441,18 +450,21 @@ def update_answers(questions: list, answers: list, test_page_bs: BeautifulSoup, 
             right_answers_count += 1
             if answer.status != "R":
                 answer.set_as_right()
-            logger.info("Answer '%s' of '%s' question is correct.", str(answer), str(question))
+            logger.info("%i of %i: Answer '%s' of '%s' question is correct.",
+                        num, questions_count, str(answer), str(question))
         elif isinstance(answer, str) and "incorrect" in answer_span["class"]:
-            logger.info("Answer '%s' of '%s' question is incorrect.", answer, str(question))
+            logger.info("%i of %i: Answer '%s' of '%s' question is incorrect.",
+                        num, questions_count, answer, str(question))
         elif isinstance(answer, str) and "correct" in answer_span["class"]:
             right_answers_count += 1
-            logger.info("Answer '%s' of '%s' question is correct.", answer, str(question))
+            logger.info("%i of %i: Answer '%s' of '%s' question is correct.",
+                        num, questions_count, answer, str(question))
     Question.unlock_all_session_question()
     results_table = test_page_bs.find("table", id="test-results-table")
     results_table_trs = results_table.find_all("td", {"class": "value"})
     passed_result_text = results_table_trs[-1].text
     if questions:
-        grade = int(right_answers_count / len(questions) * 100)
+        grade = int(right_answers_count / questions_count * 100)
         logger.debug("Grade (%i) has been gave from questions list.", grade)
     else:
         grade = int(re.search(r"^\d+", results_table_trs[-2].text).group())
@@ -464,7 +476,7 @@ def get_handled_content(element: BeautifulSoup) -> str:
     """Reading html of a bs object, download files and update text"""
     content = ""
     for child in element.children:
-        if child.name == "img":
+        if child.name == "img" and child.has_attr("src"):
             del child["style"]
             img_src = "{}{}".format(Config.WEBSITE, child["src"])
             img_response = requests.get(img_src, verify=Config.INTUIT_SSL_VERIFY)
@@ -478,6 +490,9 @@ def get_handled_content(element: BeautifulSoup) -> str:
                     logger.debug("Saved new image at '%s'.", str(img_path.absolute()))
             else:
                 logger.debug("Image '%s' already exist.", str(img_path.absolute()))
+        elif child.name == "img" and not child.has_attr("src"):
+            del child["style"]
+            logger.error("The element has <img> but without src: %s", str(child))
         elif child.name is not None:
             child = child.text
         content += str(child)

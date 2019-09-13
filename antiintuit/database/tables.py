@@ -128,6 +128,7 @@ class Test(BaseModel):
     passed_count = IntegerField(default=0)
     not_passed_count = IntegerField(default=0)
     average_rating = IntegerField(default=0)
+    unsolvable = BooleanField(default=False)
 
     @property
     def publish_id_numbers(self):
@@ -164,6 +165,11 @@ class Test(BaseModel):
         self.watcher = watcher
         self.save()
 
+    def set_as_unsolvable(self):
+        self.unsolvable = True
+        self.watcher = None
+        self.save()
+
 
 class VariantsModelInterface(BaseModel):
     """Interface for a question and an answer classes"""
@@ -185,7 +191,7 @@ class Question(VariantsModelInterface):
     title = TextField()
     last_update_at = DateTimeField(default=datetime(1, 1, 1))
     type = CharField()
-    course = ForeignKeyField(Test, backref="questions")
+    course = ForeignKeyField(Course, backref="questions")
     locked_by = CharField(null=True, default=None)
     locked_at = DateTimeField(default=None, null=True)
 
