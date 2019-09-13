@@ -25,7 +25,7 @@ class Config:
     DATABASE_PORT = None
     DATABASE_TYPE = "SQLite"
     DATABASE_USER = None
-    INTERVAL_BETWEEN_QUESTIONS = 7  # Seconds (in tests_solver.wait_timeout)
+    INTERVAL_BETWEEN_QUESTIONS = 10  # Seconds (in tests_solver.wait_timeout)
     INTERVAL_BETWEEN_SESSION_CHECK = 5  # Seconds (in tests_solver.get_or_create_question)
     INTUIT_SSL_VERIFY = True
     GRAYLOG_HOST = None

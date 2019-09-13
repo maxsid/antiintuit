@@ -28,11 +28,11 @@ logger = get_logger("antiintuit", "tests_solver")
 
 
 @exception(logger)
-def run_job(test: Test = None):
-    """Get a test and pass it"""
+def run_job(test: Test = None, account: Account = None):
+    """Get a test and pass it."""
     test_course_account, session = None, None
     try:
-        test_course_account = get_test_course_account(test)
+        test_course_account = get_test_course_account(test, account)
         session = get_authorized_session(test_course_account["account"])
         pass_test(test_course_account, session)
     except TestIsTemporarilyUnavailableForPassByAccount as ex:
@@ -55,9 +55,8 @@ def run_job(test: Test = None):
         raise
 
 
-def pass_test(test_course_account: dict, session: Session):
+def pass_test(test_course_account: dict, session: Session, no_accept=True):
     """Pass test and update questions in database"""
-    no_accept = True
     try:
         questions, answers = get_passed_questions_and_answers(session=session, **test_course_account).values()
     except NeedToPassAnotherTest as ex:
@@ -84,7 +83,7 @@ def pass_test(test_course_account: dict, session: Session):
     test.update_stats(is_test_passed, grade)
 
 
-def get_test_course_account(test: Test = None):
+def get_test_course_account(test: Test = None, account: Account = None):
     """Returns course and account of the first suitable test"""
     try:
         if test is None:
@@ -100,10 +99,13 @@ def get_test_course_account(test: Test = None):
                            (Account.reserved_until < Config.get_account_reserve_out_moment()))
                     .order_by(SQL("`passing_score`"), Test.average_rating, Test.last_scan_at, Test.created_at)
                     .limit(1)).get()
-        course, account = test.course, test.watcher
-        account.reserve()
+        course, subscribe = test.course, None
+        if account is None:
+            account = test.watcher
+            account.reserve()
+            subscribe = Subscribe.get_or_none((Subscribe.account == account) & (Subscribe.course == course))
+
         logger.info("Selected '%s' test, '%s' course and '%s' account.", str(test), str(course), str(account))
-        subscribe = Subscribe.get_or_none((Subscribe.account == account) & (Subscribe.course == course))
         if subscribe is None:
             logger.info("Account '%s' is not subscribed on '%s' course.", str(account), str(course))
             subscribe_to_course(account, course)
@@ -123,9 +125,9 @@ def get_passed_questions_and_answers(test: Test, course: Course, account: Accoun
     post_data = start_test(test, course, account, session)
 
     for iteration in range(1, Config.MAX_ITERATIONS_OF_RECEIVING_QUESTIONS + 1):
-        logger.debug("Question iteration: %i of %i", iteration, test.questions_count)
+        logger.debug("%i question iteration: %i of %i", iteration, len(questions) + 1, test.questions_count)
         if iteration == Config.MAX_ITERATIONS_OF_RECEIVING_QUESTIONS:
-            raise MaxIterationsReached("For '{}' test iteration maximum number has been reached.")
+            raise MaxIterationsReached("For '{}' test iteration maximum number has been reached.", str(test))
         question_form_bs = get_question_form(post_data, session)
         if question_form_bs is None:
             break
@@ -142,15 +144,9 @@ def get_passed_questions_and_answers(test: Test, course: Course, account: Accoun
             logger.warning("Question '%s' doesn't have answers and they will be deleted and recreated.",
                            str(question))
             question.delete_answers()
-            answer = generate_answers(question)
-            if isinstance(answer, (list, tuple)):
-                answer = answer[0]
-        if isinstance(answer, Answer):
-            logger.info("Answer '%s' (status: '%s') has been selected as answer on '%s' question.",
-                        str(answer), answer.status, str(question))
-        elif isinstance(answer, str):
-            logger.info("Answer '%s' has been selected as answer on '%s' question.",
-                        answer, str(question))
+            answer = generate_answers(question)[0]
+        logger.info("Answer '%s' (status: '%s') has been selected as answer on '%s' question.",
+                    str(answer), answer.status, str(question))
 
         questions.append(question)
         answers.append(answer)
@@ -174,6 +170,7 @@ def get_test_page_bs(test_publish_id: str, session: Session) -> BeautifulSoup:
 
 def start_test(test: Test, course: Course, account: Account, session: Session) -> dict:
     """Starts to pass an test and returns post data for the first question"""
+    repeat_test(test, account, session)
     test_page_bs = get_test_page_bs(test.publish_id, session)
     test_start_form_bs = test_page_bs.find("form", id="int-course-test-start-page-form")
     if test_start_form_bs is None:
@@ -268,15 +265,12 @@ def wait_timeout(started_at: datetime):
 
 
 def generate_answers(question: Question) -> list or str:
-    answers = None
     if question.type in ("multiple", "single"):
         answers = generate_default_answers(question)
     elif question.type == "correlation":
         answers = generate_correlation_answers(question)
     elif question.type == "template":
-        logger.info("Question '%s' has been created without answers and locked by '%s'.", str(question),
-                    Config.SESSION_ID)
-        return question.variants
+        answers = [Answer.create(variants=question.variants, question=question)]
     else:
         raise IncorrectTestType("Question '{}' has incorrect '{}' type and system can't generate new answers.".format(
             question.title, question.type))
@@ -307,9 +301,9 @@ def generate_correlation_answers(question: Question):
     all_variants = list()
     for variant in variants:
         variant, answer_variants = list(variant), list()
-        options = variant[3]
+        options = variant[2]
         for option in options:
-            variant[3] = option
+            variant[2] = option
             answer_variants.append(tuple(variant))
         all_variants.append(answer_variants)
     all_variants = product(*all_variants)
@@ -320,33 +314,28 @@ def generate_correlation_answers(question: Question):
 
 def get_answer_for_post_request(answer: Answer, question: Question = None) -> dict:
     """Returns post data of the answer"""
-    question = question or answer.question_id
-    if question.type == "multiple":
+    question = question or answer.question
+    if question.type in ("single", "multiple", "template"):
         return dict(
-            map(lambda var: (var[1], var[0]), answer.variants)
+            map(lambda var: (var[0], var[1]), answer.variants)
         )
-    elif question.type == "single":
-        first_variant = answer.variants[0]
-        return dict(variant=first_variant[0])
-    elif question.type == "template":
-        return dict(variant=answer)
     elif question.type == "correlation":
         return dict(
-            map(lambda var: (var[1], var[3][1]), answer.variants)
+            map(lambda var: (var[0], var[2][0]), answer.variants)
         )
     else:
         raise IncorrectTestType("Question '{}' has incorrect '{}' type and system can't send answers.".format(
             question.title, question.type))
 
 
-def get_variants_list(answer_elements: BeautifulSoup, test_type: str = None) -> list or str:
+def get_variants_list(answer_elements: BeautifulSoup, test_type: str = None) -> list:
     test_type = test_type or answer_elements.find("input", {"name": "test_type"})["value"].strip()
     if test_type in ("multiple", "single"):
         return get_default_variants_list(answer_elements)
     elif test_type == "correlation":
         return get_correlation_variants_list(answer_elements)
     elif test_type == "template":
-        return "no"
+        return [("variant", "no")]
     else:
         raise IncorrectTestType("Question has incorrect '{}' type and system can't send answers.".format(test_type))
 
@@ -358,16 +347,11 @@ def get_default_variants_list(answer_elements: BeautifulSoup) -> list:
     for variant_label in variants_labels_bs:
         variant_bs = variant_label.find("span", {"class": "right"})
         variant_text = get_handled_content(variant_bs)
-        variant_name = variant_label["for"]
-        variant_number = re.search(r'\d+$', variant_name)
-        if variant_number is not None:
-            variant_number = int(variant_number.group())
-        else:
-            # For case when form wrote incorrect (identical ids and names of the inputs)
-            # In this case any answer will be right
-            variant_number = ""
-        answers_list.append((variant_number, variant_name, variant_text))
-    answers_list.sort(key=lambda a: a if isinstance(a[0], int) else (-1, *a[1:]))
+        input_bs = variant_label.find("input")
+        variant_name = input_bs["name"]
+        variant_value = input_bs["value"]
+        answers_list.append((variant_name, variant_value, variant_text))
+    answers_list.sort()
     logger.debug("Found %i variants of the question.", len(answers_list))
     return answers_list
 
@@ -380,13 +364,12 @@ def get_correlation_variants_list(answer_elements: BeautifulSoup) -> list:
     for left_li, right_li in zip(left_lis_bs, right_lis_bs):
         select_bs = right_li.find("select")
         select_name = select_bs["name"]
-        select_number = int(re.search(r"\d+$", select_name).group())
         left_li.find("span", {"class": "item-number"}).decompose()
         select_title = get_handled_content(left_li)
         select_options_filter = filter(lambda o: o.has_attr("value"), select_bs.find_all("option"))
-        select_options_data = list(map(lambda o: (o[0], o[1]["value"], o[1].text.strip()),
-                                       enumerate(select_options_filter)))
-        answers_list.append((select_number, select_name, select_title, select_options_data))
+        select_options_data = list(map(lambda o: (o["value"], o.text.strip()), select_options_filter))
+        select_options_data.sort(key=lambda o: o[1])
+        answers_list.append((select_name, select_title, select_options_data))
     answers_list.sort()
     logger.debug("Found %i variants of the correlation question.", len(answers_list))
     return answers_list
@@ -438,27 +421,20 @@ def update_answers(questions: list, answers: list, test_page_bs: BeautifulSoup, 
             continue
         task_list_item = task_list_item_like.parent.parent
         answer_span = task_list_item.find("span", {"class": "task_no"})
-        if isinstance(answer, Answer) and "incorrect" in answer_span["class"]:
+        if "incorrect" in answer_span["class"]:
             answer.set_as_wrong()
             logger.info("%i of %i: Answer '%s' of '%s' question is incorrect.",
                         num, questions_count, str(answer), str(question))
-            if question.unchanged_answers_count == 1:
+            if question.type != "template" and question.unchanged_answers_count == 1:
                 logger.debug("Question has the one unchecked answer. Previously it will be marked as right.")
                 prev_answer = question.get_next_answer()
                 prev_answer.set_as_right()
-        elif isinstance(answer, Answer) and "correct" in answer_span["class"]:
+        elif "correct" in answer_span["class"]:
             right_answers_count += 1
             if answer.status != "R":
                 answer.set_as_right()
             logger.info("%i of %i: Answer '%s' of '%s' question is correct.",
                         num, questions_count, str(answer), str(question))
-        elif isinstance(answer, str) and "incorrect" in answer_span["class"]:
-            logger.info("%i of %i: Answer '%s' of '%s' question is incorrect.",
-                        num, questions_count, answer, str(question))
-        elif isinstance(answer, str) and "correct" in answer_span["class"]:
-            right_answers_count += 1
-            logger.info("%i of %i: Answer '%s' of '%s' question is correct.",
-                        num, questions_count, answer, str(question))
     Question.unlock_all_session_question()
     results_table = test_page_bs.find("table", id="test-results-table")
     results_table_trs = results_table.find_all("td", {"class": "value"})

@@ -20,23 +20,24 @@ logger = get_logger("antiintuit", "tests_manager")
 
 
 @exception(logger)
-def run_job():
+def run_job(course: Course = None):
     # Getting the tests of the first found course
-    course = (Course
-              .select()
-              .order_by(Course.last_scan_at, Course.published_on.desc())
-              .limit(1)).get()
-    if course.last_scan_at > Config.get_course_scan_timeout_moment():
-        next_in = course.last_scan_at - Config.get_course_scan_timeout_moment()
-        logger.info("All courses in timeout. Timeout is %s. Next course is '%s' will be in %s.",
-                    str(timedelta(minutes=Config.COURSE_SCAN_INTERVAL)).split(".")[0], str(course),
-                    str(next_in).split(".")[0])
-    else:
-        logger.info("Selected '%s' course.", str(course))
-        account, session = get_account_for_course(course).values()
-        new_tests, found_tests = create_tests_of_course(course, account, session).values()
-        logger.info("Tests result statistic:\n    Found tests - %i\n    New tests - %i",
-                    found_tests, new_tests)
+    if course is None:
+        course = (Course
+                  .select()
+                  .order_by(Course.last_scan_at, Course.published_on.desc())
+                  .limit(1)).get()
+        if course.last_scan_at > Config.get_course_scan_timeout_moment():
+            next_in = course.last_scan_at - Config.get_course_scan_timeout_moment()
+            logger.info("All courses in timeout. Timeout is %s. Next course is '%s' will be in %s.",
+                        str(timedelta(minutes=Config.COURSE_SCAN_INTERVAL)).split(".")[0], str(course),
+                        str(next_in).split(".")[0])
+            return
+    logger.info("Selected '%s' course.", str(course))
+    account, session = get_account_for_course(course).values()
+    new_tests, found_tests = create_tests_of_course(course, account, session).values()
+    logger.info("Tests result statistic:\n    Found tests - %i\n    New tests - %i",
+                found_tests, new_tests)
     appoint_accounts_to_tests()
 
 

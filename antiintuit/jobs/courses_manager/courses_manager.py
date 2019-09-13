@@ -91,7 +91,8 @@ def subscribe_to_course(account: Account, course: Course, session: Session = Non
     sign_in_data = dict(map(lambda inp: (inp["name"], inp["value"]), sign_in_form_inputs_bs))
     session.post("{}/int_studies/json/signin".format(Config.WEBSITE), data=sign_in_data,
                  verify=Config.INTUIT_SSL_VERIFY)
-    Subscribe.create(account=account, course=course)
+    if account.get_id() is not None:
+        Subscribe.create(account=account, course=course)
     logger.info("Account '%s' has subscribed to '%s' course.", str(account), str(course))
     return session
 

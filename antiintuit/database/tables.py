@@ -74,8 +74,9 @@ class Account(BaseModel):
         return "[{}] {} {} <{}>".format(self.id, self.first_name, self.last_name, self.email)
 
     def reserve(self):
-        self.reserved_until = datetime.utcnow()
-        self.save()
+        if self.get_id() is not None:
+            self.reserved_until = datetime.utcnow()
+            self.save()
 
     def delete_instance(self, database_only=False, recursive=False, delete_nullable=False):
         Subscribe.delete().where(Subscribe.account == self).execute()
@@ -257,16 +258,10 @@ class Question(VariantsModelInterface):
     def get_next_answer(self):
         """Returns the first right or unchecked answer of the question"""
         try:
-            if self.type in ("multiple", "single", "correlation"):
-                return (Answer
-                        .select()
-                        .where((Answer.question == self) & (Answer.status != "W"))
-                        .order_by(Answer.status).limit(1)).get()
-            elif self.type == "template":
-                return self.variants
-            else:
-                raise DatabaseException("Couldn't get the next answer because incorrect type of '{}' question.",
-                                        str(self))
+            return (Answer
+                    .select()
+                    .where(Answer.question == self)
+                    .order_by(Answer.status).limit(1)).get()
         except Answer.DoesNotExist:
             return None
 
@@ -278,7 +273,7 @@ class Answer(VariantsModelInterface):
 
     @property
     def describe(self) -> str:
-        return "[{}] {}".format(self.id, ", ".join(map(lambda v: v[2], self.variants)))
+        return "[{}] {}".format(self.id, ", ".join(map(lambda v: str(v[-1]), self.variants)))
 
     def set_as(self, status: str):
         if status in ("U", "R", "W"):
