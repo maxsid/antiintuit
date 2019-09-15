@@ -105,7 +105,7 @@ def unsubscribe_from_course(subscribe: Subscribe, session: Session = None) -> Se
     unsubscribe_url = "{}/int_studies/json/signout".format(Config.WEBSITE)
     post_data = {"title": "<span+class=\"delete\"></span>Отписаться",
                  "type": publish_id_numbers[0], "identity": publish_id_numbers[1]}
-    session.post(unsubscribe_url, post_data)
+    session.post(unsubscribe_url, post_data, verify=Config.INTUIT_SSL_VERIFY)
     subscribe.delete_instance()
     logger.info("Account '%s' has unsubscribed from '%s' course.", str(account), str(course))
     return session

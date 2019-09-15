@@ -163,7 +163,7 @@ def get_passed_questions_and_answers(test: Test, course: Course, account: Accoun
 def get_test_page_bs(test_publish_id: str, session: Session) -> BeautifulSoup:
     """Returns test page as BeautifulSoup"""
     test_url = "{}/studies/courses/{}".format(Config.WEBSITE, test_publish_id)
-    test_page_response = session.get(test_url)
+    test_page_response = session.get(test_url, verify=Config.INTUIT_SSL_VERIFY)
     test_page_bs = BeautifulSoup(test_page_response.text, "html.parser")
     return test_page_bs
 
@@ -191,7 +191,7 @@ def start_test(test: Test, course: Course, account: Account, session: Session) -
 def get_question_form(post_data: dict, session: Session) -> BeautifulSoup:
     """Returns a form of the question from a page"""
     question_json = session.post("{}/int_studies/json/callback_display_test_task".format(Config.WEBSITE),
-                                 data=post_data).json()
+                                 data=post_data, verify=Config.INTUIT_SSL_VERIFY).json()
     question_bs = BeautifulSoup(question_json["data"], "html.parser")
     question_form_bs = question_bs.find("form", id="test-task-form")
     if question_form_bs is None:
@@ -380,7 +380,7 @@ def accept_test(test: Test, account: Account, session: Session):
     ids = test.publish_id_numbers
     accept_url = "{}/int_studies/json/callback_accept_test".format(Config.WEBSITE)
     accept_post_data = {"iduniver_edu_prog": ids[0], "course_id": ids[1], "type": ids[2], "idtest": ids[3]}
-    session.post(accept_url, accept_post_data)
+    session.post(accept_url, accept_post_data, verify=Config.INTUIT_SSL_VERIFY)
     account.reserve()
     logger.info("Test '%s' is accepted on the website by '%s'.", str(test), str(account))
 
@@ -390,7 +390,7 @@ def repeat_test(test: Test, account: Account, session: Session):
     ids = test.publish_id_numbers
     repeat_url = "{}/int_studies/json/callback_repeat_test".format(Config.WEBSITE)
     repeat_post_data = {"iduniver_edu_prog": ids[0], "course_id": ids[1], "type": ids[2], "idtest": ids[3]}
-    session.post(repeat_url, repeat_post_data)
+    session.post(repeat_url, repeat_post_data, verify=Config.INTUIT_SSL_VERIFY)
     account.reserve()
     logger.info("Test '%s' will be repeated on the website by '%s'.", str(test), str(account))
 
@@ -408,7 +408,8 @@ def update_answers(questions: list, answers: list, test_page_bs: BeautifulSoup, 
     results_answers_anchor = test_page_bs.find("a", {"destination_block_id": "course-test-dialog"})
     answers_results_post_data = dict(map(lambda v: v.split("="), results_answers_anchor["request_data"].split("&")))
     answers_results_url = "{}/int_studies/json/callback_display_test_task_list".format(Config.WEBSITE)
-    answers_results_json = session.post(answers_results_url, answers_results_post_data).json()
+    answers_results_json = session.post(answers_results_url, answers_results_post_data,
+                                        verify=Config.INTUIT_SSL_VERIFY).json()
     answers_results_bs = BeautifulSoup(answers_results_json["data"], "html.parser")
     test_task_list = answers_results_bs.find("div", id="test_task_list")
     right_answers_count, questions_count = 0, len(questions)
