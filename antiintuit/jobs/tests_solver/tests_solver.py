@@ -127,7 +127,7 @@ def get_passed_questions_and_answers(test: Test, course: Course, account: Accoun
     for iteration in range(1, Config.MAX_ITERATIONS_OF_RECEIVING_QUESTIONS + 1):
         logger.debug("%i question iteration: %i of %i", iteration, len(questions) + 1, test.questions_count)
         if iteration == Config.MAX_ITERATIONS_OF_RECEIVING_QUESTIONS:
-            raise MaxIterationsReached("For '{}' test iteration maximum number has been reached.", str(test))
+            raise MaxIterationsReached("For '{}' test iteration maximum number has been reached.".format(str(test)))
         question_form_bs = get_question_form(post_data, session)
         if question_form_bs is None:
             break
