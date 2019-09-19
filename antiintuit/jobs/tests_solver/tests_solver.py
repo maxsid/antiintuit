@@ -121,12 +121,12 @@ def get_test_course_account(test: Test = None, account: Account = None):
 
 def get_passed_questions_and_answers(test: Test, course: Course, account: Account, session: Session):
     """Returns questions and answers of the current test passing"""
-    questions, answers = [], []
+    questions, answers, similar_iterations_count = list(), list(), 0
     post_data = start_test(test, course, account, session)
 
-    for iteration in range(1, Config.MAX_ITERATIONS_OF_RECEIVING_QUESTIONS + 1):
-        logger.debug("%i question iteration: %i of %i", iteration, len(questions) + 1, test.questions_count)
-        if iteration == Config.MAX_ITERATIONS_OF_RECEIVING_QUESTIONS:
+    while True:
+        logger.debug("%i of %i question", len(questions) + 1, test.questions_count)
+        if similar_iterations_count == Config.MAX_ITERATIONS_OF_RECEIVING_QUESTIONS:
             raise MaxIterationsReached("For '{}' test iteration maximum number has been reached.".format(str(test)))
         question_form_bs = get_question_form(post_data, session)
         if question_form_bs is None:
@@ -135,9 +135,12 @@ def get_passed_questions_and_answers(test: Test, course: Course, account: Accoun
         # Creating and getting question and answers
         question = get_or_create_question(question_form_bs, course)
         if question in questions:
-            logger.warning("Question '%s' had been already in the questions list of the current passing. "
-                           "Waiting %i seconds...", str(question), Config.INTERVAL_BETWEEN_QUESTIONS)
-            sleep(Config.INTERVAL_BETWEEN_QUESTIONS)
+            latency_time = (Config.LATENCY_STEP_INCREASE_BETWEEN_SIMILAR_QUESTIONS * similar_iterations_count
+                            + Config.INTERVAL_BETWEEN_QUESTIONS)
+            similar_iterations_count += 1
+            logger.warning("Question '%s' had been already in the questions list of the current passing (%i time). "
+                           "Waiting %i seconds...", str(question), similar_iterations_count, latency_time)
+            sleep(latency_time)
             continue
         answer = question.get_next_answer()
         if answer is None:
@@ -156,6 +159,7 @@ def get_passed_questions_and_answers(test: Test, course: Course, account: Accoun
         inputs = filter(lambda inp: inp.has_attr("type") and inp["type"] not in ("radio", "checkbox"), inputs_bs)
         post_data = dict(map(lambda inp: (inp["name"], inp["value"]), inputs))
         post_data.update(get_answer_for_post_request(answer, question))
+        similar_iterations_count = 0
         wait_timeout(request_executed_at)
     return {"questions": questions, "answers": answers}
 
