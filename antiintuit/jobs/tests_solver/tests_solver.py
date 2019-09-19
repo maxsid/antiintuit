@@ -90,13 +90,19 @@ def get_test_course_account(test: Test = None, account: Account = None):
             sleep_time = random.random() * Config.MAX_LATENCY_FOR_OUT_OF_SYNC
             logger.debug("Session '%s' is sleeping during %f", Config.SESSION_ID, sleep_time)
             sleep(sleep_time)
+            reserve_out_moment = Config.get_account_reserve_out_moment()
+            skip_courses_query = (Course
+                                  .select(Course.id)
+                                  .join(Test)
+                                  .where(Test.last_scan_at > reserve_out_moment))
             test = (Test
                     .select(Test,
                             (Test.average_rating * 5 + Test.passed_count * 3 + Test.not_passed_count).alias(
                                 "passing_score"))
                     .join(Account, on=(Account.id == Test.watcher))
                     .where(Test.watcher.is_null(False) &
-                           (Account.reserved_until < Config.get_account_reserve_out_moment()))
+                           (Account.reserved_until < reserve_out_moment) &
+                           (Test.course.not_in(skip_courses_query)))
                     .order_by(SQL("`passing_score`"), Test.average_rating, Test.last_scan_at, Test.created_at)
                     .limit(1)).get()
         course, subscribe = test.course, None
