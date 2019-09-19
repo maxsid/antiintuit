@@ -477,9 +477,6 @@ def get_handled_content(element: BeautifulSoup) -> str:
                     logger.debug("Saved new image at '%s'.", str(img_path.absolute()))
             else:
                 logger.debug("Image '%s' already exist.", str(img_path.absolute()))
-        elif child.name == "img" and not child.has_attr("src"):
-            del child["style"]
-            logger.error("The element has <img> but without src: %s", str(child))
         elif child.name is not None:
             child = child.text
         content += str(child)
