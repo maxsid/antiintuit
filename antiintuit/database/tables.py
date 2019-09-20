@@ -129,6 +129,7 @@ class Test(BaseModel):
     passed_count = IntegerField(default=0)
     not_passed_count = IntegerField(default=0)
     average_rating = IntegerField(default=0)
+    last_rating = IntegerField(default=0)
     unsolvable = BooleanField(default=False)
 
     @property
@@ -154,6 +155,7 @@ class Test(BaseModel):
             self.average_rating = int((self.average_rating * self.total_passed + grade) / (self.total_passed + 1))
         else:
             self.average_rating = grade
+        self.last_rating = grade
         if passed:
             self.passed_count += 1
         else:
