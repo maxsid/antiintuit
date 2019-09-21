@@ -89,18 +89,16 @@ def get_test_course_account(test: Test = None, account: Account = None):
     try:
         if test is None:
             wait_in_the_queue()
-            reserve_out_moment = Config.get_account_reserve_out_moment()
-            skip_courses_query = (Course
-                                  .select(Course.id)
-                                  .join(Test)
-                                  .where(Test.last_scan_at > reserve_out_moment))
+            skip_courses_query = (Test
+                                  .select(Test.course)
+                                  .where(Test.last_scan_at > Config.get_test_scan_timeout_moment()))
             test = (Test
                     .select(Test,
                             ((Test.average_rating + Test.last_rating + Test.max_rating) * 5 +
                              Test.passed_count * 3 + Test.not_passed_count).alias("passing_score"))
                     .join(Account, on=(Account.id == Test.watcher))
                     .where(Test.watcher.is_null(False) &
-                           (Account.reserved_until < reserve_out_moment) &
+                           (Account.reserved_until < Config.get_account_reserve_out_moment()) &
                            (Test.course.not_in(skip_courses_query)))
                     .order_by(SQL("`passing_score`"), Test.average_rating, Test.last_scan_at, Test.created_at)
                     .limit(1)).get()
@@ -108,6 +106,7 @@ def get_test_course_account(test: Test = None, account: Account = None):
         if account is None:
             account = test.watcher
             account.reserve()
+            test.update_last_update()
             get_out_of_the_queue()
             subscribe = Subscribe.get_or_none((Subscribe.account == account) & (Subscribe.course == course))
 
