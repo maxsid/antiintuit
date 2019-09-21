@@ -1,4 +1,3 @@
-import random
 import re
 from datetime import datetime, timedelta
 from hashlib import sha3_256
@@ -18,6 +17,7 @@ from antiintuit.jobs.accounts_manager import get_authorized_session
 from antiintuit.jobs.courses_manager import subscribe_to_course
 from antiintuit.jobs.tests_manager import get_publish_id_from_link
 from antiintuit.jobs.tests_solver.exceptions import *
+from antiintuit.jobs.tests_solver.queue_solution import *
 from antiintuit.logger import exception, get_logger
 
 __all__ = [
@@ -48,6 +48,7 @@ def run_job(test: Test = None, account: Account = None):
         logger.info(str(ex))
     except Exception:
         if test_course_account is not None:
+            get_out_of_the_queue()
             test, account = test_course_account["test"], test_course_account["account"]
             Question.unlock_all_session_question()
             if session is not None and isinstance(test, Test) and isinstance(account, Account):
@@ -87,9 +88,7 @@ def get_test_course_account(test: Test = None, account: Account = None):
     """Returns course and account of the first suitable test"""
     try:
         if test is None:
-            sleep_time = random.random() * Config.MAX_LATENCY_FOR_OUT_OF_SYNC
-            logger.debug("Session '%s' is sleeping during %f", Config.SESSION_ID, sleep_time)
-            sleep(sleep_time)
+            wait_in_the_queue()
             reserve_out_moment = Config.get_account_reserve_out_moment()
             skip_courses_query = (Course
                                   .select(Course.id)
@@ -109,6 +108,7 @@ def get_test_course_account(test: Test = None, account: Account = None):
         if account is None:
             account = test.watcher
             account.reserve()
+            get_out_of_the_queue()
             subscribe = Subscribe.get_or_none((Subscribe.account == account) & (Subscribe.course == course))
 
         logger.info("Selected '%s' test, '%s' course and '%s' account.", str(test), str(course), str(account))

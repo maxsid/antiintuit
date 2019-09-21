@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: session-queue
+  namespace: antiintuit
+spec:
+  selector:
+    matchLabels:
+      app: session-queue
+  serviceName: session-manager
+  template:
+    metadata:
+      labels:
+        app: session-queue
+    spec:
+      containers:
+        - name: session-queue
+          image: maxsid/antiintuit:sm-latest
+          imagePullPolicy: Always
+          livenessProbe:
+            tcpSocket:
+              port: 26960
+          ports:
+            - containerPort: 26960
+      imagePullSecrets:
+        - name: maxsid-docker-hub

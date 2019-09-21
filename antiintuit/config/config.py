@@ -37,6 +37,7 @@ class Config:
     SESSION_ID = sha3_256(urandom(256)).hexdigest()
     STATIC_DIRECTORY = "static"
     TEST_SCAN_INTERVAL = 900  # Seconds
+    TEST_SOLVER_SESSION_QUEUE_HOST = None
     WEBSITE = "https://www.intuit.ru"
 
     @staticmethod

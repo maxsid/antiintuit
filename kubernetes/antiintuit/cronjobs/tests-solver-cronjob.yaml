@@ -38,6 +38,8 @@ spec:
                   value: "false"
                 - name: CONFIG_DIRECTORIES
                   value: /sec
+                - name: TEST_SOLVER_SESSION_QUEUE_HOST
+                  value: session-queue-0.session-manager.antiintuit.svc.cluster.local
               volumeMounts:
                 - mountPath: /sec
                   name: database-secret
