@@ -10,7 +10,8 @@ __all__ = [
     "get_image_extension",
     "get_inner_html",
     "truncate",
-    "sub_timedelta"
+    "sub_timedelta",
+    "get_host_and_port"
 ]
 
 
@@ -63,3 +64,14 @@ def truncate(obj, nlen):
     if len(str_value) > nlen:
         return str_value[:nlen - 3] + '...'
     return str_value
+
+
+def get_host_and_port(address: str, default_port: int) -> tuple:
+    """Divides the address of the tuple with an host and a port"""
+    host_port = address.split(":")
+    host = host_port[0]
+    if len(host_port) == 2:
+        port = int(host_port[1])
+    else:
+        port = default_port
+    return host, port

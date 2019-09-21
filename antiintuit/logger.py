@@ -4,6 +4,7 @@ import sys
 import graypy
 import urllib3
 
+from antiintuit.basic import get_host_and_port
 from antiintuit.config import Config
 
 __all__ = [
@@ -21,15 +22,10 @@ def setup_logger():
     logger.addHandler(stdout_handler)
 
     if isinstance(Config.GRAYLOG_HOST, str):
-        host_port_list = Config.GRAYLOG_HOST.split(":")
-        graylog_handler = None
-        if len(host_port_list) == 1:
-            graylog_handler = graypy.GELFHTTPHandler(host_port_list[0], 12201)
-        elif len(host_port_list) == 2:
-            graylog_handler = graypy.GELFHTTPHandler(host_port_list[0], int(host_port_list[1]))
-        if graylog_handler is not None:
-            graylog_handler.setLevel(logging.DEBUG)
-            logger.addHandler(graylog_handler)
+        host, port = get_host_and_port(Config.GRAYLOG_HOST, 12201)
+        graylog_handler = graypy.GELFHTTPHandler(host, port)
+        graylog_handler.setLevel(logging.DEBUG)
+        logger.addHandler(graylog_handler)
 
 
 def get_logger(*module_name: str):
