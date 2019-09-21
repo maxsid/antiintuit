@@ -97,7 +97,7 @@ def get_test_course_account(test: Test = None, account: Account = None):
                                   .where(Test.last_scan_at > reserve_out_moment))
             test = (Test
                     .select(Test,
-                            ((Test.average_rating + Test.last_rating) * 5 +
+                            ((Test.average_rating + Test.last_rating + Test.max_rating) * 5 +
                              Test.passed_count * 3 + Test.not_passed_count).alias("passing_score"))
                     .join(Account, on=(Account.id == Test.watcher))
                     .where(Test.watcher.is_null(False) &
