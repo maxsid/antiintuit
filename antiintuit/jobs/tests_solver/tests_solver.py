@@ -100,7 +100,8 @@ def get_test_course_account(test: Test = None, account: Account = None):
                     .where(Test.watcher.is_null(False) &
                            (Account.reserved_until < Config.get_account_reserve_out_moment()) &
                            (Test.course.not_in(skip_courses_query)))
-                    .order_by(SQL("`passing_score`"), Test.average_rating, Test.last_scan_at, Test.created_at)
+                    .order_by(SQL("`passing_score`"), Test.max_rating, Test.average_rating,
+                              Test.last_scan_at, Test.created_at)
                     .limit(1)).get()
         course, subscribe = test.course, None
         if account is None:
