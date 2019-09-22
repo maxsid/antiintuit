@@ -200,6 +200,7 @@ class Question(VariantsModelInterface):
     course = ForeignKeyField(Course, backref="questions")
     locked_by = CharField(null=True, default=None)
     locked_at = DateTimeField(default=None, null=True)
+    original_html = TextField(default=None)
 
     @staticmethod
     def unlock_all_session_question():

@@ -238,6 +238,7 @@ def get_or_create_question(question_form_bs: BeautifulSoup, course: Course) -> Q
                 variants=variants_list,
                 locked_by=Config.SESSION_ID,
                 locked_at=datetime.utcnow(),
+                original_html=str(question_form_bs),
                 course=course)
         except peewee.IntegrityError as ex:
             if ex.args[0] == 1062:
@@ -260,6 +261,10 @@ def get_or_create_question(question_form_bs: BeautifulSoup, course: Course) -> Q
         if not question.is_right_answer_exists and question.type in ("multiple", "single", "correlation"):
             logger.debug("Question doesn't have a right answer and will be locked by Session '%s'.", Config.SESSION_ID)
             question.lock()
+        # This condition can be removed when questions don't have one without original_html
+        if question.original_html is None:
+            question.original_html = str(question_form_bs)
+            question.save()
     return question
 
 
