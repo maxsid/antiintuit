@@ -29,9 +29,9 @@ class Config:
     INTERVAL_BETWEEN_SESSION_CHECK = 5  # Seconds (in tests_solver.get_or_create_question)
     INTUIT_SSL_VERIFY = True
     GRAYLOG_HOST = None
-    LATENCY_STEP_INCREASE_BETWEEN_SIMILAR_QUESTIONS = 5  # seconds
+    LATENCY_STEP_INCREASE_BETWEEN_SIMILAR_QUESTIONS = 10  # seconds
     MAX_ACCOUNT_AGE = 60 * 24 * 1000  # Minutes
-    MAX_ITERATIONS_OF_RECEIVING_QUESTIONS = 300  # tests_solver.get_passed_questions_and_answers
+    MAX_ITERATIONS_OF_RECEIVING_QUESTIONS = 10  # tests_solver.get_passed_questions_and_answers
     MAX_LATENCY_FOR_OUT_OF_SYNC = 30  # Seconds
     MAX_LATENCY_FOR_SESSION_CHECKS = 300  # Seconds (after this time question will be forcibly selected)
     SESSION_ID = sha3_256(urandom(256)).hexdigest()

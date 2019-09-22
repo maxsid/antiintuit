@@ -84,10 +84,10 @@ def pass_test(test_course_account: dict, session: Session, no_accept=True):
     test.update_stats(is_test_passed, grade)
 
 
-def get_test_course_account(test: Test = None, account: Account = None):
+def get_test_course_account(self_test: Test = None, account: Account = None):
     """Returns course and account of the first suitable test"""
     try:
-        if test is None:
+        if self_test is None:
             wait_in_the_queue()
             skip_courses_query = (Test
                                   .select(Test.course)
@@ -103,12 +103,15 @@ def get_test_course_account(test: Test = None, account: Account = None):
                     .order_by(SQL("`passing_score`"), Test.max_rating, Test.average_rating,
                               Test.last_scan_at, Test.created_at)
                     .limit(1)).get()
+        else:
+            test = self_test
         course, subscribe = test.course, None
         if account is None:
             account = test.watcher
             account.reserve()
             test.update_last_update()
-            get_out_of_the_queue()
+            if self_test is None:
+                get_out_of_the_queue()
             subscribe = Subscribe.get_or_none((Subscribe.account == account) & (Subscribe.course == course))
 
         logger.info("Selected '%s' test, '%s' course and '%s' account.", str(test), str(course), str(account))
