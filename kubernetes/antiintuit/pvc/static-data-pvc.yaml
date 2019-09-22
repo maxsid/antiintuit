@@ -4,7 +4,6 @@ metadata:
   name: static-data
   namespace: antiintuit
 spec:
-  storageClassName: "nfs"
   accessModes:
     - ReadWriteMany
   resources:
