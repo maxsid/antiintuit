@@ -1,3 +1,4 @@
+import socket
 from datetime import datetime, timedelta
 
 from bs4 import BeautifulSoup
@@ -11,7 +12,8 @@ __all__ = [
     "get_inner_html",
     "truncate",
     "sub_timedelta",
-    "get_host_and_port"
+    "get_host_and_port",
+    "is_open_connection"
 ]
 
 
@@ -75,3 +77,14 @@ def get_host_and_port(address: str, default_port: int) -> tuple:
     else:
         port = default_port
     return host, port
+
+
+def is_open_connection(host: str, port: int):
+    """Returns True if an connection by ip and port is exists."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s.connect((host, int(port)))
+        s.shutdown(2)
+        return True
+    except:
+        return False

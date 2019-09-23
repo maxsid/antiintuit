@@ -4,7 +4,7 @@ import sys
 import graypy
 import urllib3
 
-from antiintuit.basic import get_host_and_port
+from antiintuit.basic import get_host_and_port, is_open_connection
 from antiintuit.config import Config
 
 __all__ = [
@@ -19,13 +19,17 @@ def setup_logger():
     logger.setLevel(logging.DEBUG)
     stdout_handler = logging.StreamHandler(sys.stdout)
     stdout_handler.setLevel(logging.INFO)
-    logger.addHandler(stdout_handler)
 
     if isinstance(Config.GRAYLOG_HOST, str):
         host, port = get_host_and_port(Config.GRAYLOG_HOST, 12201)
-        graylog_handler = graypy.GELFHTTPHandler(host, port)
-        graylog_handler.setLevel(logging.DEBUG)
-        logger.addHandler(graylog_handler)
+        if is_open_connection(host, port):
+            graylog_handler = graypy.GELFHTTPHandler(host, port)
+            graylog_handler.setLevel(logging.DEBUG)
+            logger.addHandler(graylog_handler)
+        else:
+            logger.warning("No connection to GrayLog (%s:%i)", host, port)
+            stdout_handler.setLevel(logging.DEBUG)
+    logger.addHandler(stdout_handler)
 
 
 def get_logger(*module_name: str):

@@ -4,7 +4,7 @@ from random import random
 from time import sleep
 
 from antiintuit.config import Config
-from antiintuit.logger import get_logger, get_host_and_port
+from antiintuit.logger import get_logger, get_host_and_port, is_open_connection
 
 __all__ = [
     "wait_in_the_queue",
@@ -30,6 +30,9 @@ def wait_in_the_queue():
         sleep(sleep_time)
         return
     host, port = get_host_and_port(Config.TEST_SOLVER_SESSION_QUEUE_HOST, 26960)
+    if not is_open_connection(host, port):
+        logger.warning("No connection to Session Queue (%s:%i)", host, port)
+        return
     message = "CHK:" + Config.SESSION_ID
     received = send_message(host, port, message)
     while not isinstance(received, dict) or not received["allow"]:
@@ -41,6 +44,9 @@ def wait_in_the_queue():
 def get_out_of_the_queue():
     if Config.TEST_SOLVER_SESSION_QUEUE_HOST is not None:
         host, port = get_host_and_port(Config.TEST_SOLVER_SESSION_QUEUE_HOST, 26960)
-        message = "DEL:" + Config.SESSION_ID
-        received = send_message(host, port, message)
-        assert received is True, "Received not True from the Session Queue"
+        if is_open_connection(host, port):
+            message = "DEL:" + Config.SESSION_ID
+            received = send_message(host, port, message)
+            assert received is True, "Received not True from the Session Queue"
+        else:
+            logger.warning("No connection to Session Queue (%s:%i)", host, port)
