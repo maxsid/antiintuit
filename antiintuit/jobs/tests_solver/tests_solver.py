@@ -10,12 +10,11 @@ from bs4 import BeautifulSoup
 from peewee import SQL
 from requests import Session
 
-from antiintuit.basic import get_image_extension
+from antiintuit.basic import get_image_extension, get_publish_id_from_link
 from antiintuit.config import Config
 from antiintuit.database import *
 from antiintuit.jobs.accounts_manager import get_authorized_session
 from antiintuit.jobs.courses_manager import subscribe_to_course
-from antiintuit.jobs.tests_manager import get_publish_id_from_link
 from antiintuit.jobs.tests_solver.exceptions import *
 from antiintuit.jobs.tests_solver.queue_solution import *
 from antiintuit.logger import exception, get_logger

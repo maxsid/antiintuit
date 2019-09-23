@@ -1,15 +1,15 @@
+import re
 import socket
 from datetime import datetime, timedelta
 
 from bs4 import BeautifulSoup
 from requests import Session
 
-# from antiintuit.config import Config
-
 __all__ = [
     "get_session",
     "get_image_extension",
     "get_inner_html",
+    "get_publish_id_from_link",
     "truncate",
     "sub_timedelta",
     "get_host_and_port",
@@ -22,7 +22,6 @@ def get_session():
     session = Session()
     session.headers.update({
         "Connection": "keep-alive",
-        # "Origin": Config.WEBSITE,
         "Content-Type": "application/x-www-form-urlencoded",
         "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
                       "Chrome/69.0.3497.12 Safari/537.36",
@@ -32,6 +31,12 @@ def get_session():
         "Host": "www.intuit.ru"
     })
     return session
+
+
+def get_publish_id_from_link(link: str) -> str:
+    """Returns publish id of a test or a course by a link."""
+    matches = re.search(r"((?P<tid>\d+/\d+/test/\d+/\d+)$|(?P<cid>\d+/\d+)/?(info)?$)", link).groupdict()
+    return matches["tid"] or matches["cid"]
 
 
 def sub_timedelta(td: timedelta) -> datetime:

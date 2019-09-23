@@ -5,6 +5,7 @@ from bs4 import BeautifulSoup
 from peewee import fn, JOIN, SQL
 from requests import Session
 
+from antiintuit.basic import get_publish_id_from_link
 from antiintuit.config import Config
 from antiintuit.database import Account, Course, Subscribe, Test
 from antiintuit.jobs.accounts_manager import get_authorized_session
@@ -12,8 +13,7 @@ from antiintuit.jobs.courses_manager import subscribe_to_course
 from antiintuit.logger import exception, get_logger
 
 __all__ = [
-    "run_job",
-    "get_publish_id_from_link"
+    "run_job"
 ]
 
 logger = get_logger("antiintuit", "tests_manager")
@@ -60,11 +60,6 @@ def get_account_for_course(course: Course) -> dict:
                    .order_by("count", Account.reserved_until)).get()
         session = subscribe_to_course(account, course)
     return {"account": account, "session": session}
-
-
-def get_publish_id_from_link(link: str) -> str:
-    """Returns publish id of the test from a link."""
-    return re.search(r"\d+/\d+/test/\d+/\d+", link).group()
 
 
 def create_tests_of_course(course: Course, account: Account, session: Session = None) -> dict:
