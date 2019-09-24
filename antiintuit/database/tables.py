@@ -115,8 +115,8 @@ class Course(BaseModel):
 
 
 class Subscribe(BaseModel):
-    account = ForeignKeyField(Account, backref="subscribes")
-    course = ForeignKeyField(Course, backref="subscribes")
+    account = ForeignKeyField(Account, backref="subscriptions")
+    course = ForeignKeyField(Course, backref="subscriptions")
 
 
 class Test(BaseModel):
