@@ -46,7 +46,7 @@ class BaseModel(Model):
 
     def __str__(self):
         if hasattr(self, "describe"):
-            return truncate(self.describe, 100)
+            return truncate(self.describe.replace("\n", "\\n"), 100)
         else:
             str(super())
 
