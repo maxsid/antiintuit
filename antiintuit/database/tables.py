@@ -1,16 +1,14 @@
-import json
 from datetime import datetime, timedelta
 
-from peewee import (Model, CharField, ForeignKeyField, TextField, DateTimeField, MySQLDatabase,
-                    SqliteDatabase, PostgresqlDatabase, BooleanField, DateField, IntegerField)
+from peewee import (CharField, ForeignKeyField, TextField, DateTimeField,
+                    BooleanField, DateField, IntegerField)
 
-from antiintuit.basic import truncate, sub_timedelta
+from antiintuit.basic import sub_timedelta
 from antiintuit.config import Config
-from antiintuit.database.exceptions import DatabaseException
+from antiintuit.database.basic import BaseModel, VariantsModel
 from antiintuit.logger import get_logger
 
 __all__ = [
-    "BaseModel",
     "Account",
     "DeletedAccount",
     "Course",
@@ -22,44 +20,6 @@ __all__ = [
 ]
 
 logger = get_logger("antiintuit", "database")
-
-
-def get_system_database():
-    """Returns connection to database received from Config"""
-    database_type = Config.DATABASE_TYPE.lower()
-    logger.debug("Connection to %s database (%s)", database_type, Config.DATABASE_NAME)
-    if database_type == "mysql":
-        port = Config.DATABASE_PORT or 3306
-        return MySQLDatabase(Config.DATABASE_NAME,
-                             host=Config.DATABASE_HOST,
-                             user=Config.DATABASE_USER,
-                             password=Config.DATABASE_PASSWORD,
-                             port=port,
-                             charset="utf8mb4")
-    elif database_type == "postgres":
-        port = Config.DATABASE_PORT or 5432
-        return PostgresqlDatabase(Config.DATABASE_NAME,
-                                  host=Config.DATABASE_HOST,
-                                  user=Config.DATABASE_USER,
-                                  password=Config.DATABASE_PASSWORD,
-                                  port=port)
-    elif database_type == "sqlite":
-        return SqliteDatabase(Config.DATABASE_NAME)
-    else:
-        raise DatabaseException("Supports sqlite, postgres or mysql(mariadb) databases, not '{}'".format(database_type))
-
-
-class BaseModel(Model):
-    created_at = DateTimeField(default=datetime.utcnow())
-
-    def __str__(self):
-        if hasattr(self, "describe"):
-            return truncate(self.describe, 100)
-        else:
-            str(super())
-
-    class Meta:
-        database = get_system_database()
 
 
 class Account(BaseModel):
@@ -177,22 +137,7 @@ class Test(BaseModel):
         self.save()
 
 
-class VariantsModelInterface(BaseModel):
-    """Interface for a question and an answer classes"""
-    _variants = TextField(help_text="The field contains a dict of variants in JSON as handled text")
-
-    @property
-    def variants(self) -> list:
-        """Returns variants as list of handled text variants"""
-        return json.loads(self._variants)
-
-    @variants.setter
-    def variants(self, variants: list):
-        """Writes variants from list of handled text variants"""
-        self._variants = json.dumps(variants)
-
-
-class Question(VariantsModelInterface):
+class Question(VariantsModel):
     task_id = IntegerField(unique=True)
     title = TextField()
     last_update_at = DateTimeField(default=datetime(1, 1, 1))
@@ -272,7 +217,7 @@ class Question(VariantsModelInterface):
             return None
 
 
-class Answer(VariantsModelInterface):
+class Answer(VariantsModel):
     status = CharField(max_length=1, default="U",
                        help_text="The field contains a status of the answer. Can be Right(R), Wrong(W) or Unchecked(U)")
     question = ForeignKeyField(Question, backref="answers")
