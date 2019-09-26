@@ -66,4 +66,4 @@ class VariantsModel(BaseModel):
     @variants.setter
     def variants(self, variants: list):
         """Writes variants from list of handled text variants"""
-        self._variants = json.dumps(variants)
+        self._variants = json.dumps(variants, ensure_ascii=False)
