@@ -1,6 +1,6 @@
-import json
 from datetime import datetime
 
+import ujson
 from peewee import MySQLDatabase, PostgresqlDatabase, SqliteDatabase, Model, DateTimeField, TextField
 
 from antiintuit.basic import truncate
@@ -61,9 +61,9 @@ class VariantsModel(BaseModel):
     @property
     def variants(self) -> list:
         """Returns variants as list of handled text variants"""
-        return json.loads(self._variants)
+        return ujson.loads(self._variants)
 
     @variants.setter
     def variants(self, variants: list):
         """Writes variants from list of handled text variants"""
-        self._variants = json.dumps(variants, ensure_ascii=False)
+        self._variants = ujson.dumps(variants, ensure_ascii=False)

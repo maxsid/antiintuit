@@ -1,8 +1,9 @@
-import json
 import logging
 import socketserver
 from os import environ
 from sys import stdout
+
+import ujson
 
 
 class SessionManagerHandler(socketserver.BaseRequestHandler):
@@ -31,8 +32,8 @@ class SessionManagerHandler(socketserver.BaseRequestHandler):
             assert sessions[0] == session, "This session isn't the first in the order."
             sessions.pop(0)
             response_data = True
-        logger.info("%s (%s) will response data: %s", self.client_address[0], session, json.dumps(response_data))
-        self.request.sendall(bytes(json.dumps(response_data), "utf-8"))
+        logger.info("%s (%s) will response data: %s", self.client_address[0], session, ujson.dumps(response_data))
+        self.request.sendall(bytes(ujson.dumps(response_data), "utf-8"))
 
 
 if __name__ == "__main__":

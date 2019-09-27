@@ -1,7 +1,8 @@
-import json
 import socket
 from random import random
 from time import sleep
+
+import ujson
 
 from antiintuit.config import Config
 from antiintuit.logger import get_logger, get_host_and_port, is_open_connection
@@ -18,7 +19,7 @@ def send_message(host, port, message):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.connect((host, port))
         sock.sendall(bytes(message + "\n", "utf-8"))
-        received = json.loads(str(sock.recv(1024), "utf-8"))
+        received = ujson.loads(str(sock.recv(1024), "utf-8"))
     logger.debug("Sent: %s\nReceived: %s", message, repr(received))
     return received
 
