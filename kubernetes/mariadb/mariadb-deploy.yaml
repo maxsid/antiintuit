@@ -33,6 +33,11 @@ spec:
               value: /sec/DATABASE_USER
             - name: MYSQL_PASSWORD_FILE
               value: /sec/DATABASE_PASSWORD
+          livenessProbe:
+            initialDelaySeconds: 30
+            periodSeconds: 3
+            tcpSocket:
+              port: 3306
           ports:
             - containerPort: 3306
           volumeMounts:
