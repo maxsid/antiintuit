@@ -9,16 +9,22 @@ from antiintuit.config import Config
 
 __all__ = [
     "exception",
-    "get_logger"
+    "get_logger",
+    "setup_logger"
 ]
 
 
-def setup_logger():
-    urllib3.disable_warnings()
-    logger = logging.getLogger("antiintuit")
+def setup_logger(name: str = None, logger: logging.Logger = None, disable_urllib_warnings=True):
+    if disable_urllib_warnings:
+        urllib3.disable_warnings()
+    if name is None and logger is None:
+        logger = logging.getLogger("antiintuit")
+    elif logger is None:
+        logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
     stdout_handler = logging.StreamHandler(sys.stdout)
     stdout_handler.setLevel(logging.INFO)
+    logger.addHandler(stdout_handler)
 
     if isinstance(Config.GRAYLOG_HOST, str):
         host, port = get_host_and_port(Config.GRAYLOG_HOST, 12201)
@@ -29,7 +35,7 @@ def setup_logger():
         else:
             logger.warning("No connection to GrayLog (%s:%i)", host, port)
             stdout_handler.setLevel(logging.DEBUG)
-    logger.addHandler(stdout_handler)
+    return logger
 
 
 def get_logger(*module_name: str):
