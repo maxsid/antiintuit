@@ -33,9 +33,12 @@ def get_session():
     return session
 
 
-def get_publish_id_from_link(link: str) -> str:
+def get_publish_id_from_link(link: str) -> str or None:
     """Returns publish id of a test or a course by a link."""
-    matches = re.search(r"((?P<tid>\d+/\d+/test/\d+/\d+)$|(?P<cid>\d+/\d+)/?(info)?$)", link).groupdict()
+    matches = re.search(r"((?P<tid>\d+/\d+/test/\d+/\d+)$|(?P<cid>\d+/\d+)/?(info)?$)", link)
+    if matches is None:
+        return None
+    matches = matches.groupdict()
     return matches["tid"] or matches["cid"]
 
 
