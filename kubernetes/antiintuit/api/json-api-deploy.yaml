@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: antiintuit-json-api
+  namespace: antiintuit
+spec:
+  selector:
+    matchLabels:
+      app: antiintuit-json-api
+  template:
+    metadata:
+      labels:
+        app: antiintuit-json-api
+    spec:
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: antiintuit-json-api
+          image: maxsid/antiintuit:api-latest
+          ports:
+            - containerPort: 5000
+          envFrom:
+            - prefix: GRAYLOG_
+              configMapRef:
+                name: graylog-config
+          readinessProbe:
+            httpGet:
+              port: 5000
+              path: /health
+          livenessProbe:
+            initialDelaySeconds: 20
+            periodSeconds: 5
+            httpGet:
+              port: 5000
+              path: /health
+          env:
+            - name: STATIC_DIRECTORY
+              value: /static-data
+            - name: CONFIG_DIRECTORIES
+              value: /sec
+          volumeMounts:
+            - mountPath: /sec
+              name: database-secret
+              readOnly: true
+            - mountPath: /static-data
+              name: static-data
+              readOnly: true
+      imagePullSecrets:
+        - name: maxsid-docker-hub
+      volumes:
+        - name: database-secret
+          secret:
+            secretName: database-secret
+        - name: static-data
+          persistentVolumeClaim:
+            claimName: static-data
