@@ -39,9 +39,12 @@ def get_model_dict(model, exclude: list or str = None, only: list or str = None)
     only = get_fields_by_names(model_class, only)
     exclude, only = exclude or None, only or None
     data = model_to_dict(model, False, exclude=exclude, only=only)
-    if hasattr(model_class, "variants") and (exclude is None or model_class._variants not in exclude):
+    if hasattr(model_class, "variants") and "_variants" in data:
         del data["_variants"]
         data["variants"] = model.variants
+    if hasattr(model_class, "link") and "publish_id" in data:
+        del data["publish_id"]
+        data["link"] = model.link
     for name, value in filter(lambda item: isinstance(item[1], (datetime, date, time)), data.items()):
         data[name] = value.isoformat()
     return data
