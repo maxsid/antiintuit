@@ -66,6 +66,10 @@ class Course(BaseModel):
         return str(self.publish_id).split("/")
 
     @property
+    def link(self) -> str:
+        return "{}/studies/courses/{}/info".format(Config.WEBSITE, self.publish_id)
+
+    @property
     def describe(self) -> str:
         return "[{}][{}] {}".format(self.id, self.publish_id, self.title)
 
@@ -97,6 +101,10 @@ class Test(BaseModel):
     def publish_id_numbers(self):
         split_publish_id = str(self.publish_id).split("/")
         return split_publish_id[:2] + split_publish_id[3:]
+
+    @property
+    def link(self):
+        return "{}/studies/courses/{}".format(Config.WEBSITE, self.publish_id)
 
     @property
     def describe(self) -> str:

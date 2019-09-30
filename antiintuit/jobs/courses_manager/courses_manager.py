@@ -73,8 +73,7 @@ def create_courses_from_page(page: int, session: Session = None) -> dict:
 def subscribe_to_course(account: Account, course: Course, session: Session = None) -> Session:
     """Subscribe account to course"""
     session = session or get_authorized_session(account)
-    info_page_response = session.get("{}/studies/courses/{}/info".format(Config.WEBSITE, course.publish_id),
-                                     verify=Config.INTUIT_SSL_VERIFY)
+    info_page_response = session.get(course.link, verify=Config.INTUIT_SSL_VERIFY)
     info_page_bs = BeautifulSoup(info_page_response.text, "html.parser")
     subscribe_anchor_bs = info_page_bs.find("a", {"class": "red ajax-command-anchor"})
     request_data = subscribe_anchor_bs["request_data"].split("&")

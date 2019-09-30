@@ -172,10 +172,9 @@ def get_passed_questions_and_answers(test: Test, course: Course, account: Accoun
     return {"questions": questions, "answers": answers}
 
 
-def get_test_page_bs(test_publish_id: str, session: Session) -> BeautifulSoup:
+def get_test_page_bs(test: Test, session: Session) -> BeautifulSoup:
     """Returns test page as BeautifulSoup"""
-    test_url = "{}/studies/courses/{}".format(Config.WEBSITE, test_publish_id)
-    test_page_response = session.get(test_url, verify=Config.INTUIT_SSL_VERIFY)
+    test_page_response = session.get(test.link, verify=Config.INTUIT_SSL_VERIFY)
     test_page_bs = BeautifulSoup(test_page_response.text, "html.parser")
     return test_page_bs
 
@@ -183,7 +182,7 @@ def get_test_page_bs(test_publish_id: str, session: Session) -> BeautifulSoup:
 def start_test(test: Test, course: Course, account: Account, session: Session) -> dict:
     """Starts to pass an test and returns post data for the first question"""
     repeat_test(test, account, session)
-    test_page_bs = get_test_page_bs(test.publish_id, session)
+    test_page_bs = get_test_page_bs(test, session)
     test_start_form_bs = test_page_bs.find("form", id="int-course-test-start-page-form")
     if test_start_form_bs is None:
         if "необходимо пройти все предыдущие тесты курса" in test_page_bs.text:

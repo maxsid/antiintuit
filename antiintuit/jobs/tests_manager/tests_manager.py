@@ -65,8 +65,7 @@ def get_account_for_course(course: Course) -> dict:
 def create_tests_of_course(course: Course, account: Account, session: Session = None) -> dict:
     """Adds tests of the course in database and updates dates"""
     session = session or get_authorized_session(account)
-    info_page_response = session.get("{}/studies/courses/{}/info".format(Config.WEBSITE, course.publish_id),
-                                     verify=Config.INTUIT_SSL_VERIFY)
+    info_page_response = session.get(course.link, verify=Config.INTUIT_SSL_VERIFY)
     info_page_bs = BeautifulSoup(info_page_response.text, "html.parser")
     menu_bs = info_page_bs.find("ul", id="non-collapsible-item-1")
     new_tests_count, found_tests_count = 0, 0
