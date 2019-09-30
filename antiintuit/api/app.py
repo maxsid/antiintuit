@@ -38,7 +38,10 @@ def get_model_data_by_id(model_name, model_id, attr):
         return jsonify_model(model)
     elif hasattr(model_class, attr) and isinstance(getattr(model_class, attr), BackrefAccessor):
         backref_query = get_query_from_args(getattr(model, attr))
-        return jsonify([get_model_dict(sm) for sm in backref_query])
+        backref_data = [get_model_dict(sm) for sm in backref_query]
+        if not backref_data:
+            abort(404)
+        return jsonify(backref_data)
     elif hasattr(model_class, attr):
         return jsonify_model(model, only=[attr])
     else:
@@ -56,7 +59,10 @@ def find_model(model_name):
         query = model_class.select().where(model_class.publish_id == publish_id).limit(1)
     else:
         query = get_query_from_args(model_class.select(), True)
-    return jsonify([get_model_dict(c) for c in query])
+    result_data = [get_model_dict(c) for c in query]
+    if not result_data:
+        abort(404)
+    return jsonify(result_data)
 
 
 @app.route("/image/<string:image_name>", methods=["GET"])
