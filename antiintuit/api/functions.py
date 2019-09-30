@@ -65,6 +65,18 @@ def get_like_query(like_value: str) -> str:
     return "%" + "%".join(map(lambda w: w.strip(), query_words)) + "%"
 
 
+def get_expression_by_operator(field, value: str, operator=None):
+    if operator is None or operator == "equal":
+        return fn.LOWER(field) == value.lower()
+    elif operator == "not" or operator == "not_equal":
+        return fn.LOWER(field) != value.lower()
+    elif operator == "like":
+        return fn.LOWER(field) % get_like_query(value)
+    elif operator == "not_like":
+        return ~(fn.LOWER(field) % get_like_query(value))
+    return None
+
+
 def get_query_from_args(query: ModelSelect, require_where=False):
     page, where_count = 1, 0
     for arg_name, arg_value in request.args.items():
@@ -78,23 +90,25 @@ def get_query_from_args(query: ModelSelect, require_where=False):
             query = query.order_by(field)
         elif arg_name == "page":
             page = int(arg_value)
-        elif arg_name.startswith("where:"):
+        elif arg_name.startswith("where:") or arg_name.startswith("or_where:"):
             operations = arg_name.split(":")
+            is_or_where = operations[0] == "or_where"
+            if len(operations) == 2:
+                operator = "equal"
+            else:
+                operator = operations[1]
             fields = get_fields_by_names(query.model, [operations[-1]])
             if len(fields) == 0:
                 abort(400)
             else:
                 field = fields[0]
-            if len(operations) == 2:
-                query = query.where(fn.LOWER(field) == arg_value.lower())
-            elif operations[1] == "not":
-                query = query.where(fn.LOWER(field) != arg_value.lower())
-            elif operations[1] == "like":
-                query = query.where(fn.LOWER(field) % get_like_query(arg_value))
-            elif operations[1] == "not_like":
-                query = query.where(~(fn.LOWER(field) % get_like_query(arg_value)))
-            else:
+            expression = get_expression_by_operator(field, arg_value, operator)
+            if expression is None:
                 abort(400)
+            if is_or_where:
+                query = query.orwhere(expression)
+            else:
+                query = query.where(expression)
             where_count += 1
     if require_where and where_count == 0:
         abort(400)
