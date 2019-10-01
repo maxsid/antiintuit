@@ -37,10 +37,7 @@ def get_model_data_by_id(model_name, model_id, attr):
     if attr is None:
         return jsonify_model(model)
     elif hasattr(model_class, attr) and isinstance(getattr(model_class, attr), BackrefAccessor):
-        backref_query = get_query_from_args(getattr(model, attr))
-        backref_data = [get_model_dict(sm) for sm in backref_query]
-        if not backref_data:
-            abort(404)
+        backref_data = get_data_for_sending(getattr(model, attr))
         return jsonify(backref_data)
     elif hasattr(model_class, attr):
         return jsonify_model(model, only=[attr])
@@ -52,16 +49,16 @@ def get_model_data_by_id(model_name, model_id, attr):
 def find_model(model_name):
     if model_name not in allow_models:
         abort(404)
+    require_where_conditions = True
     model_class = allow_models[model_name]
     if "url" in request.args and hasattr(model_class, "publish_id") and len(request.args["url"]) > 5:
         url = request.args["url"].lower().strip()
         publish_id = get_publish_id_from_link(url)
-        query = model_class.select().where(model_class.publish_id == publish_id).limit(1)
+        query = model_class.select().where(model_class.publish_id == publish_id)
+        require_where_conditions = False
     else:
-        query = get_query_from_args(model_class.select(), True)
-    result_data = [get_model_dict(c) for c in query]
-    if not result_data:
-        abort(404)
+        query = model_class.select()
+    result_data = get_data_for_sending(query, require_where_conditions)
     return jsonify(result_data)
 
 

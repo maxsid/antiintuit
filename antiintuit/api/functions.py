@@ -1,3 +1,4 @@
+import math
 from datetime import date, datetime, time
 
 import ujson
@@ -5,6 +6,7 @@ from flask import request, abort, Response
 from peewee import ModelBase, ModelSelect, fn
 from playhouse.shortcuts import model_to_dict
 
+from antiintuit.config import Config
 from antiintuit.database import Course, Test, Question
 
 __all__ = [
@@ -12,7 +14,7 @@ __all__ = [
     "jsonify",
     "jsonify_model",
     "get_fields_by_names",
-    "get_query_from_args",
+    "get_data_for_sending",
     "get_like_query"
 ]
 
@@ -77,8 +79,8 @@ def get_expression_by_operator(field, value: str, operator=None):
     return None
 
 
-def get_query_from_args(query: ModelSelect, require_where=False):
-    page, where_count = 1, 0
+def get_data_for_sending(query: ModelSelect, require_where=False):
+    page, limit, where_count = 1, Config.DEFAULT_API_LIST_LIMIT, 0
     for arg_name, arg_value in request.args.items():
         if len(arg_value) == 0:
             continue
@@ -90,6 +92,9 @@ def get_query_from_args(query: ModelSelect, require_where=False):
             query = query.order_by(field)
         elif arg_name == "page":
             page = int(arg_value)
+        elif arg_name == "limit":
+            limit = int(arg_value)
+            limit = limit if limit <= Config.MAX_API_LIST_LIMIT else Config.MAX_API_LIST_LIMIT
         elif arg_name.startswith("where:") or arg_name.startswith("or_where:"):
             operations = arg_name.split(":")
             is_or_where = operations[0] == "or_where"
@@ -112,4 +117,15 @@ def get_query_from_args(query: ModelSelect, require_where=False):
             where_count += 1
     if require_where and where_count == 0:
         abort(400)
-    return query.paginate(page, 10)
+    count = query.count()
+    if count == 0:
+        abort(404)
+    pages_count = math.ceil(count / limit)
+    data = [get_model_dict(sm) for sm in query.paginate(page, limit)]
+    return {
+        "data": data,
+        "page": page,
+        "pages": pages_count,
+        "count": count,
+        "limit": limit
+    }
