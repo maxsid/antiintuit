@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tbot
+  namespace: antiintuit
+  labels:
+    service: tbot
+spec:
+  replicas: 1
+  minReadySeconds: 30
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: tbot
+  template:
+    metadata:
+      labels:
+        app: tbot
+    spec:
+      containers:
+        - name: tbot
+          image: maxsid/antiintuit:tbot-latest
+          imagePullPolicy: Always
+          command: ["python3"]
+          args:
+            - tbot/bot.py
+            - --host=http://antiintuit-json-api:5000
+            - --redis-host=tbot-redis
+            - --token-file=/sec/token
+          volumeMounts:
+            - name: tbot-secret
+              mountPath: /sec
+              readOnly: true
+      imagePullSecrets:
+        - name: maxsid-docker-hub
+      volumes:
+        - name: tbot-secret
+          secret:
+            secretName: tbot-token
