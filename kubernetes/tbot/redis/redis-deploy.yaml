@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tbot-redis
+  namespace: antiintuit
+  labels:
+    service: tbot
+spec:
+  replicas: 1
+  minReadySeconds: 30
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: tbot-redis
+  template:
+    metadata:
+      labels:
+        app: tbot-redis
+    spec:
+      containers:
+        - name: tbot-redis
+          image: redis:5.0.6
+          args:
+            - --appendonly
+            - "yes"
+          livenessProbe:
+            initialDelaySeconds: 30
+            periodSeconds: 3
+            tcpSocket:
+              port: 6379
+          ports:
+            - containerPort: 6379
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+      volumes:
+        - name: redis-data
+          persistentVolumeClaim:
+            claimName: tbot-redis
