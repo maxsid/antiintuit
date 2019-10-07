@@ -6,7 +6,6 @@ metadata:
   labels:
     service: tbot
 spec:
-  replicas: 1
   minReadySeconds: 30
   strategy:
     type: RollingUpdate
@@ -23,12 +22,11 @@ spec:
     spec:
       containers:
         - name: tbot
-          image: maxsid/antiintuit:tbot-latest
-          imagePullPolicy: Always
+          image: maxsid/antiintuit:tbot
           command: ["python3"]
           args:
             - tbot/bot.py
-            - --host=http://antiintuit-json-api:5000
+            - --host=http://json-api:5000
             - --redis-host=tbot-redis
             - --token-file=/sec/token
           volumeMounts:

@@ -1,22 +1,27 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: antiintuit-json-api
+  name: json-api
   namespace: antiintuit
 spec:
   selector:
     matchLabels:
-      app: antiintuit-json-api
+      app: json-api
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   template:
     metadata:
       labels:
-        app: antiintuit-json-api
+        app: json-api
     spec:
       securityContext:
         fsGroup: 1000
       containers:
-        - name: antiintuit-json-api
-          image: maxsid/antiintuit:api-latest
+        - name: json-api
+          image: maxsid/antiintuit:api
           ports:
             - containerPort: 5000
           envFrom:
