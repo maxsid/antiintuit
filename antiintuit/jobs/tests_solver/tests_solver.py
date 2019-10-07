@@ -20,10 +20,18 @@ from antiintuit.jobs.tests_solver.queue_solution import *
 from antiintuit.logger import exception, get_logger
 
 __all__ = [
-    "run_job"
+    "run_job",
+    "run_endless_job_loop"
 ]
 
 logger = get_logger("antiintuit", "tests_solver")
+
+
+def run_endless_job_loop():
+    iteration_count = count(1)
+    while True:
+        logger.info("It will be %i iteration without errors", next(iteration_count))
+        run_job()
 
 
 @exception(logger)

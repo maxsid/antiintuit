@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: endless-tests-solver
+  namespace: antiintuit
+spec:
+  replicas: 10
+  selector:
+    matchLabels:
+      app: endless-tests-solver
+  template:
+    metadata:
+      labels:
+        app: endless-tests-solver
+    spec:
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: endless-tests-solver
+          image: maxsid/antiintuit
+          command:
+            - python
+            - -c
+            - from antiintuit.jobs.tests_solver import run_endless_job_loop; run_endless_job_loop()
+          envFrom:
+            - prefix: GRAYLOG_
+              configMapRef:
+                name: graylog-config
+          env:
+            - name: STATIC_DIRECTORY
+              value: /static-data
+            - name: INTUIT_SSL_VERIFY
+              value: "false"
+            - name: CONFIG_DIRECTORIES
+              value: /sec
+            - name: TEST_SOLVER_SESSION_QUEUE_HOST
+              value: session-queue-0.session-manager.antiintuit.svc.cluster.local
+          volumeMounts:
+            - mountPath: /sec
+              name: database-secret
+              readOnly: true
+            - mountPath: /static-data
+              name: static-data
+      imagePullSecrets:
+        - name: maxsid-docker-hub
+      volumes:
+        - name: database-secret
+          secret:
+            secretName: database-secret
+        - name: static-data
+          persistentVolumeClaim:
+            claimName: static-data
