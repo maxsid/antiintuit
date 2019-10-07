@@ -2,9 +2,9 @@ from random import randint
 
 from requests import Session
 
+from antiintuit.jobs.accounts_manager.temp_mailbox.letter_interface import LetterInterface
+from antiintuit.jobs.accounts_manager.temp_mailbox.mailbox_interface import MailboxInterface
 from antiintuit.logger import get_logger
-from antiintuit.temp_mailbox.letter_interface import LetterInterface
-from antiintuit.temp_mailbox.mailbox_interface import MailboxInterface
 
 __all__ = [
     "GetnadaMailbox",

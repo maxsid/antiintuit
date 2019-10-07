@@ -4,10 +4,11 @@ from random import randint
 from requests import Response
 
 from antiintuit.basic import get_session
+from antiintuit.jobs.accounts_manager.temp_mailbox.letter_interface import LetterInterface
+from antiintuit.jobs.accounts_manager.temp_mailbox.mailbox_interface import MailboxInterface
+from antiintuit.jobs.accounts_manager.temp_mailbox.services.mytemp_email.mytemp_email_exceptions \
+    import MyTempEmailException
 from antiintuit.logger import get_logger
-from antiintuit.temp_mailbox.letter_interface import LetterInterface
-from antiintuit.temp_mailbox.mailbox_interface import MailboxInterface
-from antiintuit.temp_mailbox.services.mytemp_email.mytemp_email_exceptions import MyTempEmailException
 
 __all__ = [
     "MyTempEmailLetter",

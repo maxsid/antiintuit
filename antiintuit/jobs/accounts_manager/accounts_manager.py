@@ -10,8 +10,8 @@ from antiintuit.basic import get_session
 from antiintuit.config import Config
 from antiintuit.database import Account, DeletedAccount
 from antiintuit.jobs.accounts_manager.exceptions import *
+from antiintuit.jobs.accounts_manager.temp_mailbox import get_random_mailbox, TempMailBoxException
 from antiintuit.logger import exception, get_logger
-from antiintuit.temp_mailbox import get_random_mailbox, TempMailBoxException
 
 __all__ = [
     "get_authorized_session",
